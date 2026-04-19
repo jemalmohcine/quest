@@ -66,17 +66,27 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const recordStartedAtRef = useRef<number>(0);
+
+  /** WebKit / PWA: periodic chunks; stop mic tracks only after recorder finishes (avoids empty blobs). */
+  const RECORD_TIMESLICE_MS = 250;
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.requestData();
+        } catch {
+          /* */
+        }
         mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       }
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
     };
   }, []);
 
@@ -97,12 +107,11 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
   }, [isOpen, resetFlow]);
 
   const pickRecorderMimeType = (): string | undefined => {
-    const candidates = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/ogg;codecs=opus',
-    ];
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const candidates = isIOS
+      ? ['audio/mp4', 'audio/webm', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus']
+      : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
     for (const c of candidates) {
       if (MediaRecorder.isTypeSupported(c)) return c;
     }
@@ -112,6 +121,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
       const mime = pickRecorderMimeType();
       const mediaRecorder = mime
         ? new MediaRecorder(stream, { mimeType: mime })
@@ -128,18 +138,30 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
       };
 
       mediaRecorder.onstop = async () => {
+        const streamToStop = recordingStreamRef.current;
+        recordingStreamRef.current = null;
+        if (streamToStop) {
+          streamToStop.getTracks().forEach((track) => track.stop());
+        }
+        mediaRecorderRef.current = null;
+
         const elapsedMs = Date.now() - recordStartedAtRef.current;
         const blobType = mediaRecorder.mimeType || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
-        const minMs = 900;
-        if (elapsedMs < minMs || audioBlob.size < 200) {
+        const minMs = 600;
+        const minBytes = 64;
+        if (elapsedMs < minMs) {
+          setError(t('recordingTooShort'));
+          return;
+        }
+        if (audioBlob.size < minBytes) {
           setError(t('recordingTooShort'));
           return;
         }
         processAudio(audioBlob);
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(RECORD_TIMESLICE_MS);
       setIsRecording(true);
       setError(null);
 
@@ -165,11 +187,16 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
       timerRef.current = null;
     }
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state === 'recording') {
+      try {
+        mr.requestData();
+      } catch {
+        /* older Safari */
+      }
+      mr.stop();
     }
+    setIsRecording(false);
   };
 
   const formatTime = (seconds: number) => {
