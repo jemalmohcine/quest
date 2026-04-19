@@ -1,22 +1,30 @@
-const CACHE_NAME = 'quest-v1';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-];
+/**
+ * Service worker minimal pour PWA.
+ * Important : ne pas servir le HTML en cache-first après un déploiement Vite :
+ * l'index en cache référence d'anciens /assets/*.js qui n'existent plus → page blanche.
+ * Stratégie : toujours aller au réseau ; à l'activation, supprimer les anciens caches.
+ */
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+      await self.clients.claim();
+    })()
   );
 });
 
 self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') {
+    return;
+  }
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
+    fetch(req).catch(() => caches.match(req))
   );
 });
