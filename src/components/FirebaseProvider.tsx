@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db, onAuthStateChanged, doc, onSnapshot, setDoc, Timestamp, FirebaseUser } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { translations, TranslationKey } from '../lib/translations';
+import { applyDomTheme, persistTheme } from '../lib/theme-preference';
 
 interface FirebaseContextType {
   user: FirebaseUser | null;
@@ -66,24 +67,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!profile) return;
 
-    const applyTheme = (theme: 'light' | 'dark' | 'system') => {
-      const root = window.document.documentElement;
-      root.classList.remove('light', 'dark');
+    const theme = profile.theme || 'system';
+    persistTheme(theme);
+    applyDomTheme(theme);
 
-      if (theme === 'system') {
-        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        root.classList.add(systemTheme);
-      } else {
-        root.classList.add(theme);
-      }
-    };
-
-    applyTheme(profile.theme || 'system');
-
-    // Listen for system theme changes if theme is 'system'
     if (profile.theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const handleChange = () => applyTheme('system');
+      const handleChange = () => applyDomTheme('system');
       mediaQuery.addEventListener('change', handleChange);
       return () => mediaQuery.removeEventListener('change', handleChange);
     }

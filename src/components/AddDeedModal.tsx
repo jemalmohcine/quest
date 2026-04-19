@@ -109,7 +109,7 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
         deedData.thought = thought;
       }
 
-      await addDoc(collection(db, path), deedData);
+      await addDoc(collection(db, 'users', user.uid, 'deeds'), deedData);
       
       // Reset form
       setActionName('');

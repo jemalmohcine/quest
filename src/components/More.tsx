@@ -11,6 +11,7 @@ import { User, Globe, Target, Bell, Download, Trash2, LogOut, Info, Camera, Load
 import { useState } from 'react';
 import { format, startOfMonth, startOfWeek } from 'date-fns';
 import { cn } from '../lib/utils';
+import { applyDomTheme, persistTheme } from '../lib/theme-preference';
 import { UI_CONSTANTS } from '../constants';
 import { SectionHeader } from './SectionHeader';
 
@@ -49,6 +50,10 @@ export function More() {
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user) return;
+    if (updates.theme) {
+      persistTheme(updates.theme);
+      applyDomTheme(updates.theme);
+    }
     setIsUpdating(true);
     try {
       await updateDoc(doc(db, 'users', user.uid), updates);

@@ -1,11 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useFirebase } from './FirebaseProvider';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Textarea } from './ui/textarea';
 import { Mic, Square, Loader2, Check, X } from 'lucide-react';
-import { PILLARS, FEELINGS } from '../types';
-import { db, collection, addDoc, Timestamp, handleFirestoreError, OperationType } from '../lib/firebase';
+import { PILLARS, FEELINGS, Pillar, Feeling, PILLAR_LABELS } from '../types';
+import { db, collection, addDoc, Timestamp } from '../lib/firebase';
 import { cn, createDeedMetadata } from '../lib/utils';
 import { UI_CONSTANTS } from '../constants';
 
@@ -14,15 +18,53 @@ interface AudioAssistantProps {
   onClose: () => void;
 }
 
+type ReviewDraft = {
+  pillar: Pillar;
+  actionName: string;
+  duration: string;
+  feeling: Feeling;
+  thought: string;
+};
+
+function normalizeAiPayload(raw: Record<string, unknown>) {
+  const pillar =
+    typeof raw.pillar === 'string' && PILLARS.includes(raw.pillar as Pillar)
+      ? (raw.pillar as Pillar)
+      : 'mindset';
+  const actionName = typeof raw.actionName === 'string' ? raw.actionName.trim() : '';
+  let duration: number | null = null;
+  if (raw.duration != null && raw.duration !== '') {
+    const n = Number(raw.duration);
+    if (!Number.isNaN(n) && n >= 0) duration = n;
+  }
+  const feeling =
+    typeof raw.feeling === 'string' && FEELINGS.includes(raw.feeling as Feeling)
+      ? (raw.feeling as Feeling)
+      : 'neutral';
+  const thought = typeof raw.thought === 'string' ? raw.thought.trim() : '';
+  return { pillar, actionName, duration, feeling, thought };
+}
+
+function toReviewDraft(n: ReturnType<typeof normalizeAiPayload>): ReviewDraft {
+  return {
+    pillar: n.pillar,
+    actionName: n.actionName,
+    duration: n.duration != null ? String(n.duration) : '',
+    feeling: n.feeling,
+    thought: n.thought,
+  };
+}
+
 export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
   const { user, profile, t } = useFirebase();
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [extractedDeed, setExtractedDeed] = useState<any>(null);
-  const [missingField, setMissingField] = useState<'duration' | 'pillar' | null>(null);
+  const [extractedDeed, setExtractedDeed] = useState<ReturnType<typeof normalizeAiPayload> | null>(null);
+  const [reviewDraft, setReviewDraft] = useState<ReviewDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -36,6 +78,22 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
       }
     };
   }, []);
+
+  const resetFlow = useCallback(() => {
+    setExtractedDeed(null);
+    setReviewDraft(null);
+    setError(null);
+    setIsProcessing(false);
+    setIsSaving(false);
+  }, []);
+
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      resetFlow();
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, resetFlow]);
 
   const startRecording = async () => {
     try {
@@ -53,21 +111,21 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        if (audioBlob.size < 1000) { 
-           setError("Recording too short. Please speak clearly.");
-           setIsProcessing(false);
-           return;
+        if (audioBlob.size < 1000) {
+          setError("Recording too short. Please speak clearly.");
+          setIsProcessing(false);
+          return;
         }
         processAudio(audioBlob);
       };
 
-      mediaRecorder.start(1000); 
+      mediaRecorder.start(1000);
       setIsRecording(true);
       setError(null);
 
       timerRef.current = setInterval(() => {
         setRecordingSeconds(prev => {
-          if (prev >= 59) { 
+          if (prev >= 59) {
             stopRecording();
             return 60;
           }
@@ -86,7 +144,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -102,6 +160,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
 
   const processAudio = async (blob: Blob) => {
     setIsProcessing(true);
+    setError(null);
     try {
       const reader = new FileReader();
       reader.readAsDataURL(blob);
@@ -109,75 +168,77 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
         try {
           const base64Data = (reader.result as string).split(',')[1];
           const apiKey = process.env.GEMINI_API_KEY;
-          
+
           if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
             throw new Error("Gemini API Key is not configured.");
           }
 
           const ai = new GoogleGenAI({ apiKey });
-        
-        const prompt = extractedDeed && missingField 
-          ? `The user is providing the missing ${missingField} for their action.
-             Current action: ${extractedDeed.actionName}
-             Extract only the ${missingField} from this new audio and return the updated JSON.`
-          : `Analyze the user's speech and identify the specific deed (action) they performed.
-             
-             Categorize it into one of these 5 pillars:
-             - soulset: Meditation, prayer, gratitude, spiritual study, silence, deep breathing.
-             - healthset: Gym, running, walking, hydration, healthy meals, sleep, stretching.
-             - mindset: Reading, learning, cognitive training, mental planning, focus work.
-             - skillset: Practicing a craft, coding, playing an instrument, professional training.
-             - heartset: Family time, volunteering, helping others, meaningful conversation, kindness.
-             
-             Return a JSON object with: 
-             - pillar: one of the 5 keywords above
-             - actionName: a clear, premium sounding title (e.g. "Deep Focus Session" instead of "I worked")
-             - duration: number in minutes (if mentioned, otherwise null)
-             - feeling: one of [happy, tired, neutral, proud]
-             - thought: a short 1-sentence reflection if they shared one.
-             
-             Language: ${profile?.language === 'fr' ? 'French' : 'English'}.
-             Be decisive. If unclear, choose the most probable pillar based on the action.`;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                { inlineData: { mimeType: 'audio/webm', data: base64Data } }
-              ]
+          const lang = profile?.language === 'fr' ? 'French' : 'English';
+          const fidelity =
+            profile?.language === 'fr'
+              ? `Fidélité au discours : le titre (actionName) doit coller à ce que la personne a réellement dit (ex. « j'ai fait 20 minutes de méditation » → un titre proche, pas un autre sport). N'invente pas d'activité absente de l'audio.`
+              : `Faithfulness: actionName must match what the speaker actually said (e.g. "I meditated 20 minutes" → keep that meaning). Do not invent activities they did not mention.`;
+
+          const prompt = `Listen to the audio and extract ONE deed (one concrete action) the user describes.
+
+${fidelity}
+
+Pillar keywords (pick exactly one): soulset, healthset, mindset, skillset, heartset — use the definitions below only to choose the pillar, not to rewrite their story.
+- soulset: meditation, prayer, gratitude, spiritual practice, breathing, silence
+- healthset: exercise, sleep, food, hydration, sport, body care
+- mindset: learning, reading, focus, planning, study, journaling for clarity
+- skillset: craft, coding, music practice, training a skill for work or art
+- heartset: family, friends, kindness, volunteering, emotional connection
+
+Return JSON with:
+- pillar: one of soulset | healthset | mindset | skillset | heartset
+- actionName: short title in ${lang}, faithful to their words (light polish OK, no marketing fluff)
+- duration: minutes as a number if they stated a duration, else null
+- feeling: exactly one of: ${FEELINGS.join(', ')}
+- thought: one short reflective sentence only if they expressed a reflection, else null
+
+Language for actionName and thought: ${lang}.`;
+
+          const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: [
+              {
+                parts: [
+                  { text: prompt },
+                  { inlineData: { mimeType: 'audio/webm', data: base64Data } }
+                ]
+              }
+            ],
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  pillar: { type: Type.STRING, enum: PILLARS },
+                  actionName: { type: Type.STRING },
+                  duration: { type: Type.NUMBER, nullable: true },
+                  feeling: { type: Type.STRING, enum: FEELINGS, nullable: true },
+                  thought: { type: Type.STRING, nullable: true },
+                },
+                required: ["pillar", "actionName"],
+              }
             }
-          ],
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                pillar: { type: Type.STRING, enum: PILLARS },
-                actionName: { type: Type.STRING },
-                duration: { type: Type.NUMBER, nullable: true },
-                feeling: { type: Type.STRING, enum: FEELINGS, nullable: true },
-                thought: { type: Type.STRING, nullable: true },
-              },
-              required: ["pillar", "actionName"],
-            }
-          }
-        });
+          });
 
-        if (!response.text) throw new Error("No response from AI.");
+          const text = response.text;
+          if (!text) throw new Error("No response from AI.");
 
-        const result = JSON.parse(response.text);
-        
-        const updatedDeed = extractedDeed ? { ...extractedDeed, ...result } : result;
-        
-        // Don't block on missing fields, just show the result
-        setExtractedDeed(updatedDeed);
-        setMissingField(null);
-        setIsProcessing(false);
-        } catch (innerErr: any) {
+          const parsed = JSON.parse(text) as Record<string, unknown>;
+          const normalized = normalizeAiPayload(parsed);
+          setExtractedDeed(normalized);
+          setReviewDraft(toReviewDraft(normalized));
+          setIsProcessing(false);
+        } catch (innerErr: unknown) {
           console.error("Gemini API Error:", innerErr);
-          setError(innerErr.message || t('audioError'));
+          const msg = innerErr instanceof Error ? innerErr.message : t('audioError');
+          setError(msg);
           setIsProcessing(false);
         }
       };
@@ -188,27 +249,57 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
   };
 
   const handleSave = async () => {
-    if (!user || !extractedDeed) return;
+    if (!user || !reviewDraft) return;
 
-    const path = `users/${user.uid}/deeds`;
+    const title = reviewDraft.actionName.trim();
+    if (!title) {
+      setError(t('actionNameRequired'));
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
     try {
-      const deedData: any = {
-        ...extractedDeed,
+      const deedData: Record<string, unknown> = {
+        pillar: reviewDraft.pillar,
+        actionName: title,
+        feeling: reviewDraft.feeling,
         createdAt: Timestamp.now(),
-        ...createDeedMetadata()
+        ...createDeedMetadata(),
       };
 
-      await addDoc(collection(db, path), deedData);
+      if (reviewDraft.duration.trim()) {
+        const d = parseInt(reviewDraft.duration, 10);
+        if (!Number.isNaN(d) && d >= 0) deedData.duration = d;
+      }
+      if (reviewDraft.thought.trim()) {
+        deedData.thought = reviewDraft.thought.trim();
+      }
+
+      await addDoc(collection(db, 'users', user.uid, 'deeds'), deedData);
+      resetFlow();
       onClose();
-      setExtractedDeed(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+    } catch (e) {
+      console.error(e);
+      setError(t('saveDeedFailed'));
+    } finally {
+      setIsSaving(false);
     }
   };
 
+  const lang = profile?.language || 'en';
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn("bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white sm:max-w-[425px] p-0 overflow-hidden", UI_CONSTANTS.cardRadius)}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          resetFlow();
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className={cn("bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white sm:max-w-[425px] p-0 overflow-hidden max-h-[90vh] overflow-y-auto", UI_CONSTANTS.cardRadius)}>
         <div className="bg-indigo-600 p-6 flex items-center gap-4">
           <div className={cn("w-12 h-12 bg-white/20 flex items-center justify-center backdrop-blur-sm", UI_CONSTANTS.buttonRadius)}>
             <Mic className="w-6 h-6 text-white" />
@@ -220,19 +311,8 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
         </div>
 
         <div className="p-8 flex flex-col items-center justify-center space-y-8">
-          {( (!extractedDeed || missingField) && !isProcessing) && (
+          {!extractedDeed && !isProcessing && (
             <div className="flex flex-col items-center space-y-6 w-full">
-              {missingField && extractedDeed && (
-                <div className={cn("w-full p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-center animate-in fade-in slide-in-from-top-4", UI_CONSTANTS.cardRadius)}>
-                  <p className="text-zinc-600 dark:text-zinc-300 text-sm font-medium mb-1">
-                    {missingField === 'duration' ? "I've got the action, but how long did it take?" : "Which pillar does this belong to?"}
-                  </p>
-                  <p className="text-indigo-600 dark:text-indigo-400 font-black text-xs uppercase tracking-widest">
-                    {missingField === 'duration' ? "Specify Duration" : "Specify Pillar"}
-                  </p>
-                </div>
-              )}
-              
               <div className="relative">
                 {isRecording && (
                   <div className="absolute inset-0 bg-indigo-500/20 rounded-full animate-ping" />
@@ -241,8 +321,8 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
                   onClick={isRecording ? stopRecording : startRecording}
                   className={cn(
                     "w-24 h-24 rounded-full shadow-2xl transition-all active:scale-90 relative z-10",
-                    isRecording 
-                      ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20' 
+                    isRecording
+                      ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
                       : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20'
                   )}
                 >
@@ -251,7 +331,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
               </div>
               <div className="text-center space-y-2">
                 <p className="font-bold text-zinc-900 dark:text-white text-lg tracking-tight">
-                  {isRecording ? t('listening') : missingField ? "Tap to provide detail" : t('tapToSpeak')}
+                  {isRecording ? t('listening') : t('tapToSpeak')}
                 </p>
                 {isRecording && (
                   <p className="text-indigo-600 dark:text-indigo-400 font-mono text-2xl font-black animate-pulse">
@@ -269,54 +349,100 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
             </div>
           )}
 
-          {extractedDeed && !missingField && (
-            <div className="w-full space-y-6">
+          {extractedDeed && reviewDraft && !isProcessing && (
+            <div className="w-full space-y-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('deedExtracted')}</p>
+              <p className="text-xs text-zinc-500">{t('actionNameHint')}</p>
+
               <div className={cn("p-6 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 space-y-4", UI_CONSTANTS.cardRadius)}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{t('pillar')}</span>
-                  <span className="px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-wider">
-                    {extractedDeed.pillar}
-                  </span>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('pillar')}</Label>
+                  <Select
+                    value={reviewDraft.pillar}
+                    onValueChange={(v) => v && setReviewDraft((d) => d ? { ...d, pillar: v as Pillar } : d)}
+                  >
+                    <SelectTrigger className={cn("bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700", UI_CONSTANTS.buttonRadius)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PILLARS.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {PILLAR_LABELS[lang][p]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{t('actionName')}</span>
-                  <p className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">{extractedDeed.actionName}</p>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('actionName')}</Label>
+                  <Input
+                    value={reviewDraft.actionName}
+                    onChange={(e) => setReviewDraft((d) => d ? { ...d, actionName: e.target.value } : d)}
+                    className={cn("font-bold", UI_CONSTANTS.buttonRadius)}
+                  />
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{t('duration')}</span>
-                    <p className="font-black text-indigo-600 dark:text-indigo-400">{extractedDeed.duration || '--'} min</p>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('duration')}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      placeholder=""
+                      value={reviewDraft.duration}
+                      onChange={(e) => setReviewDraft((d) => d ? { ...d, duration: e.target.value } : d)}
+                      className={UI_CONSTANTS.buttonRadius}
+                    />
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{t('feeling')}</span>
-                    <p className="font-bold capitalize text-zinc-900 dark:text-white">{extractedDeed.feeling || 'Neutral'}</p>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('feeling')}</Label>
+                    <Select
+                      value={reviewDraft.feeling}
+                      onValueChange={(v) => v && setReviewDraft((d) => d ? { ...d, feeling: v as Feeling } : d)}
+                    >
+                      <SelectTrigger className={cn("bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700", UI_CONSTANTS.buttonRadius)}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FEELINGS.map((f) => (
+                          <SelectItem key={f} value={f}>{f}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                {extractedDeed.thought && (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{t('thought')}</span>
-                    <p className="text-xs text-zinc-500 italic leading-relaxed">"{extractedDeed.thought}"</p>
-                  </div>
-                )}
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('thought')}</Label>
+                  <Textarea
+                    value={reviewDraft.thought}
+                    onChange={(e) => setReviewDraft((d) => d ? { ...d, thought: e.target.value } : d)}
+                    rows={2}
+                    className={cn("resize-none text-sm", UI_CONSTANTS.buttonRadius)}
+                  />
+                </div>
               </div>
 
               <div className="flex gap-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setExtractedDeed(null);
-                    setMissingField(null);
-                  }}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetFlow}
+                  disabled={isSaving}
                   className={cn("flex-1 h-12 border-zinc-200 dark:border-zinc-800 font-bold uppercase text-[10px] tracking-widest transition-transform active:scale-95 hover:bg-zinc-100", UI_CONSTANTS.buttonRadius)}
                 >
                   <X className="w-4 h-4 mr-2" />
-                  {t('tryAgain')}
+                  {t('reRecordAudio')}
                 </Button>
-                <Button 
+                <Button
+                  type="button"
                   onClick={handleSave}
+                  disabled={isSaving}
                   className={cn("flex-1 h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-500/20 uppercase text-[10px] tracking-widest transition-transform active:scale-95", UI_CONSTANTS.buttonRadius)}
                 >
-                  <Check className="w-4 h-4 mr-2" />
+                  {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
                   {t('saveDeed')}
                 </Button>
               </div>
@@ -324,14 +450,14 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
           )}
 
           {error && (
-            <div className={cn("p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest text-center", UI_CONSTANTS.cardRadius)}>
+            <div className={cn("w-full p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest text-center", UI_CONSTANTS.cardRadius)}>
               {error}
-              <Button 
-                variant="link" 
+              <Button
+                variant="link"
+                type="button"
                 onClick={() => {
                   setError(null);
-                  setExtractedDeed(null);
-                  setIsProcessing(false);
+                  if (!extractedDeed) setIsProcessing(false);
                 }}
                 className="block mx-auto mt-2 text-red-600 dark:text-red-400 font-black uppercase text-[10px]"
               >
