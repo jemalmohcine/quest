@@ -68,6 +68,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordStartedAtRef = useRef<number>(0);
 
   useEffect(() => {
     return () => {
@@ -95,13 +96,30 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
     wasOpenRef.current = isOpen;
   }, [isOpen, resetFlow]);
 
+  const pickRecorderMimeType = (): string | undefined => {
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+    ];
+    for (const c of candidates) {
+      if (MediaRecorder.isTypeSupported(c)) return c;
+    }
+    return undefined;
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const mime = pickRecorderMimeType();
+      const mediaRecorder = mime
+        ? new MediaRecorder(stream, { mimeType: mime })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       setRecordingSeconds(0);
+      recordStartedAtRef.current = Date.now();
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -110,16 +128,18 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        if (audioBlob.size < 1000) {
-          setError("Recording too short. Please speak clearly.");
-          setIsProcessing(false);
+        const elapsedMs = Date.now() - recordStartedAtRef.current;
+        const blobType = mediaRecorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
+        const minMs = 900;
+        if (elapsedMs < minMs || audioBlob.size < 200) {
+          setError(t('recordingTooShort'));
           return;
         }
         processAudio(audioBlob);
       };
 
-      mediaRecorder.start(1000);
+      mediaRecorder.start();
       setIsRecording(true);
       setError(null);
 
@@ -207,7 +227,7 @@ Language for actionName and thought: ${lang}.`;
               {
                 parts: [
                   { text: prompt },
-                  { inlineData: { mimeType: 'audio/webm', data: base64Data } }
+                  { inlineData: { mimeType: blob.type || 'audio/webm', data: base64Data } }
                 ]
               }
             ],
