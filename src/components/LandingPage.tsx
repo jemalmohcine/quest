@@ -16,6 +16,15 @@ interface LandingPageProps {
   onGetStarted: () => void;
 }
 
+/** IntersectionObserver: sur mobile la barre d’adresse change la fenêtre visible et peut refaire entrer/sortir les cartes. */
+const LANDING_IN_VIEW = {
+  once: true,
+  amount: 0.35,
+  margin: '12% 0px',
+} as const;
+
+const pillarEnter = { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const };
+
 export function LandingPage({ onGetStarted }: LandingPageProps) {
   const { } = useFirebase();
 
@@ -61,7 +70,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           <motion.div 
             initial={{ opacity: 0, x: -50 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
+            viewport={LANDING_IN_VIEW}
+            transition={pillarEnter}
             className="relative z-10 max-w-5xl w-full mt-4 md:mt-0"
           >
             <div className="flex flex-wrap items-center gap-3 md:gap-8 mb-8">
@@ -119,7 +129,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              viewport={LANDING_IN_VIEW}
+              transition={{ ...pillarEnter, delay: 0 }}
               id="soulset"
               className="md:col-span-8 bg-zinc-900 rounded-xl p-10 flex flex-col justify-between relative overflow-hidden group hover:bg-zinc-800/80 transition-all duration-500"
             >
@@ -142,8 +153,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
+              viewport={LANDING_IN_VIEW}
+              transition={{ ...pillarEnter, delay: 0.08 }}
               id="healthset"
               className="md:col-span-4 bg-zinc-900 rounded-xl p-10 flex flex-col justify-between relative overflow-hidden group hover:bg-zinc-800/80 transition-all duration-500"
             >
@@ -165,8 +176,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
+              viewport={LANDING_IN_VIEW}
+              transition={{ ...pillarEnter, delay: 0.16 }}
               id="mindset"
               className="md:col-span-4 bg-zinc-900 rounded-xl p-10 flex flex-col justify-between relative overflow-hidden group hover:bg-zinc-800/80 transition-all duration-500"
             >
@@ -185,8 +196,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
+              viewport={LANDING_IN_VIEW}
+              transition={{ ...pillarEnter, delay: 0.24 }}
               id="skillset"
               className="md:col-span-4 bg-zinc-900 rounded-xl p-10 flex flex-col justify-between relative overflow-hidden group hover:bg-zinc-800/80 transition-all duration-500"
             >
@@ -205,8 +216,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.4 }}
+              viewport={LANDING_IN_VIEW}
+              transition={{ ...pillarEnter, delay: 0.32 }}
               id="heartset"
               className="md:col-span-4 bg-zinc-900 rounded-xl p-10 flex flex-col justify-between relative overflow-hidden group hover:bg-zinc-800/80 transition-all duration-500"
             >
@@ -256,7 +267,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             <motion.div 
               initial={{ opacity: 0, x: 50 }}
               whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
+              viewport={LANDING_IN_VIEW}
+              transition={pillarEnter}
             >
               <span className="text-primary-kinetic font-black tracking-[0.5em] uppercase text-xs mb-6 block">Future of Identity</span>
               <h2 className="font-headline text-5xl md:text-6xl font-black uppercase tracking-tighter mb-8 leading-tight">AI-Powered <br/>Narrative Resumes</h2>
