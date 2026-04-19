@@ -140,7 +140,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
              Be decisive. If unclear, choose the most probable pillar based on the action.`;
 
         const response = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
+          model: "gemini-3-flash-preview",
           contents: [
             {
               parts: [
@@ -215,7 +215,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
           </div>
           <div>
             <DialogTitle className="text-xl font-bold text-white tracking-tight leading-none">{t('audioAssistant')}</DialogTitle>
-            <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mt-1">{t('weeklyJourney')}</p>
+            <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mt-1">{t('audioAssistantTagline')}</p>
           </div>
         </div>
 

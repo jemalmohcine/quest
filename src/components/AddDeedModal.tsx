@@ -132,7 +132,7 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
           </div>
           <div>
             <DialogTitle className="text-xl font-bold text-white tracking-tight leading-none">{t('logDeed')}</DialogTitle>
-            <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mt-1">{t('weeklyJourney')}</p>
+            <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mt-1">{t('logDeedTagline')}</p>
           </div>
         </div>
 

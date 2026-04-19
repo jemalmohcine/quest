@@ -111,7 +111,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               <h2 className="font-headline text-4xl md:text-5xl font-bold uppercase tracking-tighter mb-4">The 5 Pillar Architecture</h2>
               <p className="text-zinc-400 text-lg">Achieve total alignment by optimizing the five dimensions of human performance.</p>
             </div>
-            <div className="font-headline text-6xl md:text-8xl font-black text-white/5 tracking-tighter">01—OS</div>
+            <div className="font-headline text-6xl md:text-8xl font-black text-white/5 tracking-tighter">01 / OS</div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:h-[800px]">
@@ -261,7 +261,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               <span className="text-primary-kinetic font-black tracking-[0.5em] uppercase text-xs mb-6 block">Future of Identity</span>
               <h2 className="font-headline text-5xl md:text-6xl font-black uppercase tracking-tighter mb-8 leading-tight">AI-Powered <br/>Narrative Resumes</h2>
               <p className="text-xl text-zinc-400 mb-10 leading-relaxed">
-                Stop recording static history. Our AI engine transforms your daily deeds—from spiritual practices to performance habits—into a living <span className="text-white font-bold">Personal Evolution Summary</span>. 
+                Stop recording static history. Our AI engine transforms your daily deeds, from spiritual practices to performance habits, into a living <span className="text-white font-bold">Personal Evolution Summary</span>. 
               </p>
               <ul className="space-y-6 mb-12 text-zinc-300">
                 {[
