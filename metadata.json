@@ -1,0 +1,6 @@
+{
+  "name": "Quest",
+  "description": "Quest is the definitive personal growth platform for holistic excellence. Balance the 5 essential pillars—Soul, Health, Mind, Skill, and Heart—with AI-driven insights, neural voice logging, and real-time progress analytics. Architect your life with purpose.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}

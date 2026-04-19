@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - email: string (required, email format)
+    //   - name: string (required)
+    //   - createdAt: timestamp (required)
+    //   - language: string (required, 'en' or 'fr')
+    //   - dailyObjective: number (required)
+    //   - objectivePerPillar: map (required, keys: soulset, healthset, mindset, skillset, heartset)
+    //
+    // Collection: users/{userId}/deeds
+    // Fields:
+    //   - pillar: string (required, enum)
+    //   - actionName: string (required)
+    //   - duration: number (optional)
+    //   - thought: string (optional)
+    //   - feeling: string (required, enum)
+    //   - createdAt: timestamp (required)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - week: number (required)
+    //   - month: string (required, YYYY-MM)
+    //   - year: number (required)
+    //   - time: string (required, HH:MM)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'name', 'createdAt', 'language', 'dailyObjective', 'objectivePerPillar']) &&
+             data.email is string && isValidEmail(data.email) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.createdAt is timestamp &&
+             data.language in ['en', 'fr'] &&
+             data.dailyObjective is int && data.dailyObjective >= 0 &&
+             data.objectivePerPillar is map &&
+             data.objectivePerPillar.keys().hasAll(['soulset', 'healthset', 'mindset', 'skillset', 'heartset']);
+    }
+
+    function isValidDeed(data) {
+      return data.keys().hasAll(['pillar', 'actionName', 'feeling', 'createdAt', 'date', 'week', 'month', 'year', 'time']) &&
+             data.pillar in ['soulset', 'healthset', 'mindset', 'skillset', 'heartset'] &&
+             data.actionName is string && data.actionName.size() > 0 && data.actionName.size() < 200 &&
+             data.feeling in ['happy', 'confident', 'frustrated', 'neutral', 'energized', 'calm', 'motivated', 'peaceful', 'tired', 'focused'] &&
+             data.createdAt is timestamp &&
+             data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             data.week is int &&
+             data.month is string && data.month.matches("^\\d{4}-\\d{2}$") &&
+             data.year is int &&
+             data.time is string && data.time.matches("^\\d{2}:\\d{2}$") &&
+             (!('duration' in data) || data.duration == null || (data.duration is int && data.duration >= 0)) &&
+             (!('thought' in data) || data.thought == null || (data.thought is string && data.thought.size() < 1000));
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      
+      match /deeds/{deedId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidDeed(request.resource.data);
+        allow update: if isOwner(userId) && isValidDeed(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /weekly_resumes/{resumeId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
