@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFirebase } from './FirebaseProvider';
 import { db, collection, query, where, orderBy, limit, onSnapshot, deleteDoc, doc } from '../lib/firebase';
 import { Deed, PILLARS, PILLAR_COLORS, PILLAR_LABELS } from '../types';
@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { DeleteDeedDialog } from './DeleteDeedDialog';
 import { Sparkles, User as UserIcon } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell, Tooltip, LabelList } from 'recharts';
 import { cn, dailyProgressBreakdown, pillarDailyTarget } from '../lib/utils';
 import { DeedCard } from './DeedCard';
@@ -21,7 +21,6 @@ export function Dashboard({ onTabChange }: {
   const { user, profile, t } = useFirebase();
   const [todayDeeds, setTodayDeeds] = useState<Deed[]>([]);
   const [recentDeeds, setRecentDeeds] = useState<Deed[]>([]);
-  const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [deedToDelete, setDeedToDelete] = useState<Deed | null>(null);
   const [deedToEdit, setDeedToEdit] = useState<Deed | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,56 +28,50 @@ export function Dashboard({ onTabChange }: {
   useEffect(() => {
     if (!user) return;
 
+    let todayReady = false;
+    let recentReady = false;
+    const trySetLoaded = () => {
+      if (todayReady && recentReady) setIsLoading(false);
+    };
+
     const today = format(new Date(), 'yyyy-MM-dd');
     const deedsRef = collection(db, 'users', user.uid, 'deeds');
 
-    // Today's deeds
     const todayQuery = query(deedsRef, where('date', '==', today));
-    const unsubscribeToday = onSnapshot(todayQuery, (snapshot) => {
-      const deeds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Deed));
-      setTodayDeeds(deeds);
-    });
+    const unsubscribeToday = onSnapshot(
+      todayQuery,
+      (snapshot) => {
+        const deeds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Deed));
+        setTodayDeeds(deeds);
+        todayReady = true;
+        trySetLoaded();
+      },
+      (err) => {
+        console.error('Error fetching today deeds:', err);
+        setIsLoading(false);
+      }
+    );
 
-    // Recent deeds (Limit to 4 for better dashboard layout)
     const recentQuery = query(deedsRef, orderBy('createdAt', 'desc'), limit(4));
-    const unsubscribeRecent = onSnapshot(recentQuery, (snapshot) => {
-      const deeds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Deed));
-      setRecentDeeds(deeds);
-    });
-
-    // Weekly data for chart
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = subDays(new Date(), 6 - i);
-      return format(d, 'yyyy-MM-dd');
-    });
-
-    const weeklyQuery = query(deedsRef, where('date', '>=', last7Days[0]));
-    const unsubscribeWeekly = onSnapshot(weeklyQuery, (snapshot) => {
-      const deeds = snapshot.docs.map(doc => doc.data() as Deed);
-      const loc = profile?.language || 'en';
-
-      const data = PILLARS.map(pillar => {
-        const count = deeds.filter(d => d.pillar === pillar).length;
-        return {
-          name: PILLAR_LABELS[loc][pillar],
-          count: count,
-          pillar: pillar,
-          objective: profile?.objectivePerPillar?.[pillar] || 1
-        };
-      });
-      setWeeklyData(data);
-      setIsLoading(false);
-    }, (err) => {
-      console.error("Error fetching dashboard data:", err);
-      setIsLoading(false);
-    });
+    const unsubscribeRecent = onSnapshot(
+      recentQuery,
+      (snapshot) => {
+        const deeds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Deed));
+        setRecentDeeds(deeds);
+        recentReady = true;
+        trySetLoaded();
+      },
+      (err) => {
+        console.error('Error fetching recent deeds:', err);
+        setIsLoading(false);
+      }
+    );
 
     return () => {
       unsubscribeToday();
       unsubscribeRecent();
-      unsubscribeWeekly();
     };
-  }, [user, profile]);
+  }, [user]);
 
   const totalToday = todayDeeds.length;
   const { effective: progressEffective, target: dailyTarget, percent: progressPercent } = dailyProgressBreakdown(
@@ -87,6 +80,20 @@ export function Dashboard({ onTabChange }: {
   );
   const dailyGoalComplete = progressPercent >= 100;
   const dashLang = profile?.language || 'en';
+
+  const pillarDistributionData = useMemo(
+    () =>
+      PILLARS.map((pillar) => {
+        const count = todayDeeds.filter((d) => d.pillar === pillar).length;
+        return {
+          name: PILLAR_LABELS[dashLang][pillar],
+          count,
+          pillar,
+          objective: profile?.objectivePerPillar?.[pillar] || 1,
+        };
+      }),
+    [todayDeeds, dashLang, profile?.objectivePerPillar]
+  );
 
   const handleDelete = async () => {
     if (!user || !deedToDelete?.id) return;
@@ -244,7 +251,7 @@ export function Dashboard({ onTabChange }: {
               <>
                 <div className="h-48 min-h-[200px] w-full max-md:pointer-events-none">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={weeklyData}>
+                    <BarChart data={pillarDistributionData}>
                       <XAxis 
                         dataKey="name" 
                         hide
@@ -263,7 +270,7 @@ export function Dashboard({ onTabChange }: {
                         }}
                       />
                       <Bar dataKey="count" radius={[6, 6, 6, 6]}>
-                        {weeklyData.map((entry, index) => (
+                        {pillarDistributionData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={PILLAR_COLORS[entry.pillar as keyof typeof PILLAR_COLORS]} />
                         ))}
                         <LabelList
@@ -279,7 +286,7 @@ export function Dashboard({ onTabChange }: {
                   </ResponsiveContainer>
                 </div>
                 <div className="mt-6 space-y-3">
-                  {weeklyData.map((item) => (
+                  {pillarDistributionData.map((item) => (
                     <div key={item.pillar} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: PILLAR_COLORS[item.pillar as keyof typeof PILLAR_COLORS] }} />
