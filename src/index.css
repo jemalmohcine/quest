@@ -127,6 +127,13 @@
 }
 
 @layer base {
+  html {
+    height: 100%;
+  }
+  #root {
+    min-height: 100dvh;
+    min-height: 100vh;
+  }
   * {
     @apply border-zinc-200 dark:border-zinc-800;
   }

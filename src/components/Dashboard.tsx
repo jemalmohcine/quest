@@ -214,7 +214,7 @@ export function Dashboard({ onTabChange }: {
               </div>
             ) : (
               <>
-                <div className="h-48 w-full min-h-[200px]">
+                <div className="h-48 min-h-[200px] w-full touch-pan-y">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={weeklyData}>
                       <XAxis 
