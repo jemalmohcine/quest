@@ -8,9 +8,10 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { Mic, Square, Loader2, Check, X } from 'lucide-react';
-import { PILLARS, FEELINGS, Pillar, Feeling, PILLAR_LABELS } from '../types';
+import { PILLARS, Pillar, PILLAR_LABELS, UserProfile } from '../types';
 import { db, collection, addDoc, Timestamp } from '../lib/firebase';
 import { cn, createDeedMetadata } from '../lib/utils';
+import { allFeelingOptions, normalizeFeelingKey } from '../lib/feelings';
 import { UI_CONSTANTS } from '../constants';
 
 interface AudioAssistantProps {
@@ -22,11 +23,11 @@ type ReviewDraft = {
   pillar: Pillar;
   actionName: string;
   duration: string;
-  feeling: Feeling;
+  feeling: string;
   thought: string;
 };
 
-function normalizeAiPayload(raw: Record<string, unknown>) {
+function normalizeAiPayload(raw: Record<string, unknown>, profile: UserProfile | null | undefined) {
   const pillar =
     typeof raw.pillar === 'string' && PILLARS.includes(raw.pillar as Pillar)
       ? (raw.pillar as Pillar)
@@ -37,10 +38,14 @@ function normalizeAiPayload(raw: Record<string, unknown>) {
     const n = Number(raw.duration);
     if (!Number.isNaN(n) && n >= 0) duration = n;
   }
-  const feeling =
-    typeof raw.feeling === 'string' && FEELINGS.includes(raw.feeling as Feeling)
-      ? (raw.feeling as Feeling)
-      : 'neutral';
+  const allowed = new Set(allFeelingOptions(profile));
+  let feeling = 'neutral';
+  if (typeof raw.feeling === 'string' && raw.feeling.trim()) {
+    const keyed = normalizeFeelingKey(raw.feeling);
+    const lower = raw.feeling.trim().toLowerCase();
+    if (allowed.has(keyed)) feeling = keyed;
+    else if (allowed.has(lower)) feeling = lower;
+  }
   const thought = typeof raw.thought === 'string' ? raw.thought.trim() : '';
   return { pillar, actionName, duration, feeling, thought };
 }
@@ -60,6 +65,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedDeed, setExtractedDeed] = useState<ReturnType<typeof normalizeAiPayload> | null>(null);
+  const feelingChoices = allFeelingOptions(profile);
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -243,7 +249,7 @@ Return JSON with:
 - pillar: one of soulset | healthset | mindset | skillset | heartset
 - actionName: short title in ${lang}, faithful to their words (light polish OK, no marketing fluff)
 - duration: minutes as a number if they stated a duration, else null
-- feeling: exactly one of: ${FEELINGS.join(', ')}
+- feeling: exactly one of: ${feelingChoices.join(', ')}
 - thought: one short reflective sentence only if they expressed a reflection, else null
 
 Language for actionName and thought: ${lang}.`;
@@ -266,7 +272,7 @@ Language for actionName and thought: ${lang}.`;
                   pillar: { type: Type.STRING, enum: PILLARS },
                   actionName: { type: Type.STRING },
                   duration: { type: Type.NUMBER, nullable: true },
-                  feeling: { type: Type.STRING, enum: FEELINGS, nullable: true },
+                  feeling: { type: Type.STRING, enum: feelingChoices, nullable: true },
                   thought: { type: Type.STRING, nullable: true },
                 },
                 required: ["pillar", "actionName"],
@@ -278,7 +284,7 @@ Language for actionName and thought: ${lang}.`;
           if (!text) throw new Error("No response from AI.");
 
           const parsed = JSON.parse(text) as Record<string, unknown>;
-          const normalized = normalizeAiPayload(parsed);
+          const normalized = normalizeAiPayload(parsed, profile);
           setExtractedDeed(normalized);
           setReviewDraft(toReviewDraft(normalized));
           setIsProcessing(false);
@@ -411,7 +417,7 @@ Language for actionName and thought: ${lang}.`;
                     <SelectTrigger className={cn("bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700", UI_CONSTANTS.buttonRadius)}>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white">
                       {PILLARS.map((p) => (
                         <SelectItem key={p} value={p}>
                           {PILLAR_LABELS[lang][p]}
@@ -447,13 +453,13 @@ Language for actionName and thought: ${lang}.`;
                     <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('feeling')}</Label>
                     <Select
                       value={reviewDraft.feeling}
-                      onValueChange={(v) => v && setReviewDraft((d) => d ? { ...d, feeling: v as Feeling } : d)}
+                      onValueChange={(v) => v && setReviewDraft((d) => d ? { ...d, feeling: v } : d)}
                     >
                       <SelectTrigger className={cn("bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700", UI_CONSTANTS.buttonRadius)}>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        {FEELINGS.map((f) => (
+                      <SelectContent className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white">
+                        {feelingChoices.map((f) => (
                           <SelectItem key={f} value={f}>{f}</SelectItem>
                         ))}
                       </SelectContent>

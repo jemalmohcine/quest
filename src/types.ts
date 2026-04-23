@@ -20,8 +20,11 @@ export interface UserProfile {
   createdAt: Timestamp;
   language: 'en' | 'fr';
   theme: 'light' | 'dark' | 'system';
+  /** Somme des objectifs par pilier (affichage / compat). */
   dailyObjective: number;
   objectivePerPillar: Record<Pillar, number>;
+  /** Sentiments supplémentaires saisis par l’utilisateur (slug lowercase). */
+  customFeelings?: string[];
   photoURL?: string;
 }
 
@@ -31,7 +34,8 @@ export interface Deed {
   actionName: string;
   duration?: number | null;
   thought?: string | null;
-  feeling: Feeling;
+  /** Préréglages + sentiments personnalisés du profil. */
+  feeling: string;
   createdAt: Timestamp;
   date: string; // YYYY-MM-DD
   week: number;

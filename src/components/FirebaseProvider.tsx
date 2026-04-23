@@ -47,7 +47,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
                 mindset: 1,
                 skillset: 1,
                 heartset: 1
-              }
+              },
+              customFeelings: [],
             };
             setDoc(userDocRef, newProfile);
             setProfile(newProfile);

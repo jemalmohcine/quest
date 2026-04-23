@@ -4,6 +4,7 @@ import { db, collection, query, orderBy, onSnapshot, deleteDoc, doc } from '../l
 import { Deed, PILLAR_LABELS, Pillar } from '../types';
 import { Button } from './ui/button';
 import { DeleteDeedDialog } from './DeleteDeedDialog';
+import { EditDeedDialog } from './EditDeedDialog';
 import { ChevronLeft, Filter, Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Input } from './ui/input';
@@ -22,6 +23,7 @@ export function Activities({ onBack }: { onBack: () => void }) {
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [searchQuery, setSearchQuery] = useState('');
   const [deedToDelete, setDeedToDelete] = useState<Deed | null>(null);
+  const [deedToEdit, setDeedToEdit] = useState<Deed | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -147,6 +149,7 @@ export function Activities({ onBack }: { onBack: () => void }) {
             <DeedCard 
               key={deed.id} 
               deed={deed} 
+              onEdit={setDeedToEdit}
               onDelete={setDeedToDelete}
             />
           ))
@@ -158,6 +161,7 @@ export function Activities({ onBack }: { onBack: () => void }) {
         onClose={() => setDeedToDelete(null)}
         onConfirm={handleDelete}
       />
+      <EditDeedDialog deed={deedToEdit} onClose={() => setDeedToEdit(null)} />
     </div>
   );
 }

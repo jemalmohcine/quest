@@ -5,7 +5,7 @@ import { Deed } from '../types';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { format, startOfWeek, endOfWeek, subWeeks, getWeek, getYear } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subWeeks, getWeek, getYear, parseISO, isAfter } from 'date-fns';
 import { FileText, Volume2, Download, Play, Pause, Loader2, Share2, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../lib/utils';
@@ -13,6 +13,8 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { UI_CONSTANTS } from '../constants';
 import { SectionHeader } from './SectionHeader';
 import { Skeleton } from './ui/skeleton';
+
+const MIN_WEEKLY_DEEDS = 3;
 
 export function Resumes() {
   const { user, profile, t } = useFirebase();
@@ -100,8 +102,23 @@ export function Resumes() {
 
   const [error, setError] = useState<string | null>(null);
 
+  /** True once the calendar week of `selectedWeek` has fully ended (after Sunday). */
+  const weekHasEnded = (() => {
+    try {
+      const start = parseISO(selectedWeek);
+      return isAfter(new Date(), endOfWeek(start));
+    } catch {
+      return false;
+    }
+  })();
+
+  const canGenerateResume =
+    !hasGeneratedThisWeek &&
+    deeds.length >= MIN_WEEKLY_DEEDS &&
+    weekHasEnded;
+
   const generateNarrative = async () => {
-    if (!user || deeds.length === 0 || isGenerating) return;
+    if (!user || deeds.length === 0 || isGenerating || !canGenerateResume) return;
     
     setIsGenerating(true);
     setError(null);
@@ -147,6 +164,8 @@ export function Resumes() {
         weekId,
         weekStart: selectedWeek,
         createdAt: Timestamp.now(),
+        finalized: true,
+        finalizedAt: Timestamp.now(),
       });
       setHasGeneratedThisWeek(true);
       setAudioUrl(null); 
@@ -335,23 +354,44 @@ export function Resumes() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <section className="lg:col-span-2 space-y-6">
-          {!hasGeneratedThisWeek && deeds.length > 0 && (
-            <div className={cn("p-4 bg-indigo-500/5 border border-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-medium leading-relaxed italic", UI_CONSTANTS.cardRadius)}>
-              {t('resumeWarning')}
+          {hasGeneratedThisWeek && (
+            <div className={cn("p-4 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold leading-relaxed", UI_CONSTANTS.cardRadius)}>
+              {t('resumeFinalized')} {t('resumeIrreversible')}
             </div>
           )}
-          <div className="flex items-center justify-between">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t('weeklyNarrative')}</h2>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={generateNarrative} 
-              disabled={isGenerating || deeds.length === 0 || hasGeneratedThisWeek}
-              className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-400/10 h-9 rounded-xl font-bold disabled:opacity-50 text-[10px] uppercase tracking-widest"
-            >
-              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
-              {hasGeneratedThisWeek ? "Report Available" : t('generate')}
-            </Button>
+          {!hasGeneratedThisWeek && deeds.length > 0 && !weekHasEnded && (
+            <div className={cn("p-4 bg-indigo-500/5 border border-indigo-500/10 text-indigo-800 dark:text-indigo-200 text-xs font-medium leading-relaxed", UI_CONSTANTS.cardRadius)}>
+              {t('resumeWaitWeekEnd')}
+            </div>
+          )}
+          {!hasGeneratedThisWeek && weekHasEnded && deeds.length > 0 && deeds.length < MIN_WEEKLY_DEEDS && (
+            <div className={cn("p-4 bg-indigo-500/5 border border-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs font-medium leading-relaxed", UI_CONSTANTS.cardRadius)}>
+              {t('resumeMinDeeds')}
+            </div>
+          )}
+          {!hasGeneratedThisWeek && weekHasEnded && deeds.length >= MIN_WEEKLY_DEEDS && (
+            <div className={cn("p-4 bg-indigo-500/5 border border-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs font-medium leading-relaxed italic", UI_CONSTANTS.cardRadius)}>
+              {t('resumeIrreversible')}
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">{t('weeklyNarrative')}</h2>
+            {hasGeneratedThisWeek ? (
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+                {t('resumeAlreadyGenerated')}
+              </span>
+            ) : weekHasEnded && deeds.length >= MIN_WEEKLY_DEEDS ? (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={generateNarrative} 
+                disabled={isGenerating || deeds.length === 0 || !canGenerateResume}
+                className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 hover:bg-indigo-500/10 h-9 rounded-xl font-bold disabled:opacity-50 text-[10px] uppercase tracking-widest"
+              >
+                {isGenerating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                {t('generate')}
+              </Button>
+            ) : null}
           </div>
 
           {error && (
@@ -409,7 +449,13 @@ export function Resumes() {
                 <div className={cn("w-16 h-16 bg-indigo-600/10 flex items-center justify-center mx-auto mb-4", UI_CONSTANTS.buttonRadius)}>
                   <Sparkles className="w-8 h-8 text-indigo-600 dark:text-indigo-500" />
                 </div>
-                <p className="text-zinc-500 font-bold italic text-sm">{t('clickGenerate')}</p>
+                <p className="text-zinc-500 font-bold italic text-sm">
+                  {!weekHasEnded
+                    ? t('resumeWaitWeekEnd')
+                    : deeds.length < MIN_WEEKLY_DEEDS
+                      ? t('resumeMinDeeds')
+                      : t('clickGenerate')}
+                </p>
               </CardContent>
             </Card>
           )}

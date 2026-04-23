@@ -5,7 +5,7 @@ import { Deed, PILLAR_COLORS, PILLAR_LABELS, Pillar, PILLARS } from '../types';
 import { Card } from './ui/card';
 import { DeleteDeedDialog } from './DeleteDeedDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip, LabelList, Legend } from 'recharts';
 import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, eachDayOfInterval, subDays, eachMonthOfInterval, isSameMonth } from 'date-fns';
 import { Filter } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -13,6 +13,7 @@ import { DeedCard } from './DeedCard';
 import { UI_CONSTANTS } from '../constants';
 import { SectionHeader } from './SectionHeader';
 import { Skeleton } from './ui/skeleton';
+import { EditDeedDialog } from './EditDeedDialog';
 
 type TimePeriod = 'day' | 'week' | 'month' | 'year';
 
@@ -22,7 +23,11 @@ export function Stats() {
   const [period, setPeriod] = useState<TimePeriod>('week');
   const [filterPillar, setFilterPillar] = useState<Pillar | 'all'>('all');
   const [deedToDelete, setDeedToDelete] = useState<Deed | null>(null);
+  const [deedToEdit, setDeedToEdit] = useState<Deed | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const emptyPillarCounts = (): Record<Pillar, number> =>
+    PILLARS.reduce((acc, p) => ({ ...acc, [p]: 0 }), {} as Record<Pillar, number>);
 
   useEffect(() => {
     if (!user) return;
@@ -68,9 +73,11 @@ export function Stats() {
     }
   };
 
+  const lang = profile?.language ?? 'en';
+
   // Chart Data: Deeds by Pillar
   const deedsByPillarData = PILLARS.map(pillar => ({
-    name: PILLAR_LABELS['en'][pillar],
+    name: PILLAR_LABELS[lang][pillar],
     count: deeds.filter(d => d.pillar === pillar).length,
     pillar: pillar,
     objective: profile?.objectivePerPillar[pillar] || 1
@@ -78,7 +85,7 @@ export function Stats() {
 
   // Chart Data: Duration by Pillar
   const durationByPillarData = PILLARS.map(pillar => ({
-    name: PILLAR_LABELS['en'][pillar],
+    name: PILLAR_LABELS[lang][pillar],
     duration: deeds.filter(d => d.pillar === pillar).reduce((acc, d) => acc + (d.duration || 0), 0),
     pillar: pillar,
     unit: 'min'
@@ -98,46 +105,61 @@ export function Stats() {
     ? deeds 
     : deeds.filter(d => d.pillar === filterPillar);
 
-  // Time Series Data
-  const getTimeSeriesData = () => {
+  // Time series: stacked counts per pillar per bucket
+  const getTimeSeriesData = (): Record<string, string | number>[] => {
     const now = new Date();
     if (period === 'day') {
-      return Array.from({ length: 24 }, (_, i) => {
-        const hour = i;
-        const count = deeds.filter(d => {
-          const deedTime = parseInt(d.time.split(':')[0]);
-          return deedTime === hour;
-        }).length;
-        return { name: `${hour}h`, count };
+      return Array.from({ length: 24 }, (_, hour) => {
+        const row: Record<string, string | number> = { name: `${hour}h`, ...emptyPillarCounts() };
+        deeds.forEach((d) => {
+          const h = parseInt(d.time.split(':')[0], 10);
+          if (h === hour) row[d.pillar] = (row[d.pillar] as number) + 1;
+        });
+        return row;
       });
     }
 
     if (period === 'week') {
       const days = eachDayOfInterval({ start: subDays(now, 6), end: now });
-      return days.map(day => {
+      return days.map((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
-        const count = deeds.filter(d => d.date === dateStr).length;
-        return { name: format(day, 'EEE'), count, date: dateStr };
+        const row: Record<string, string | number> = {
+          name: format(day, 'EEE'),
+          date: dateStr,
+          ...emptyPillarCounts(),
+        };
+        deeds.filter((d) => d.date === dateStr).forEach((d) => {
+          row[d.pillar] = (row[d.pillar] as number) + 1;
+        });
+        return row;
       });
     }
 
     if (period === 'month') {
       const days = eachDayOfInterval({ start: subDays(now, 29), end: now });
-      return days.map(day => {
+      return days.map((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
-        const count = deeds.filter(d => d.date === dateStr).length;
-        return { name: format(day, 'd MMM'), count, date: dateStr };
+        const row: Record<string, string | number> = {
+          name: format(day, 'd MMM'),
+          date: dateStr,
+          ...emptyPillarCounts(),
+        };
+        deeds.filter((d) => d.date === dateStr).forEach((d) => {
+          row[d.pillar] = (row[d.pillar] as number) + 1;
+        });
+        return row;
       });
     }
 
     if (period === 'year') {
       const months = eachMonthOfInterval({ start: startOfYear(now), end: now });
-      return months.map(month => {
-        const count = deeds.filter(d => {
+      return months.map((month) => {
+        const row: Record<string, string | number> = { name: format(month, 'MMM'), ...emptyPillarCounts() };
+        deeds.forEach((d) => {
           const deedDate = new Date(d.date);
-          return isSameMonth(deedDate, month);
-        }).length;
-        return { name: format(month, 'MMM'), count };
+          if (isSameMonth(deedDate, month)) row[d.pillar] = (row[d.pillar] as number) + 1;
+        });
+        return row;
       });
     }
 
@@ -173,26 +195,46 @@ export function Stats() {
 
       {/* Activity Over Time Chart */}
       <section className="space-y-6">
-        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Activity Over Time</h2>
+        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">{t('activityOverTime')}</h2>
         <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-8 rounded-[2rem] shadow-2xl">
           {isLoading ? (
             <Skeleton className="h-64 w-full" />
           ) : (
-            <div className="h-64 w-full">
+            <div className="h-72 w-full min-h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={timeSeriesData}>
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#71717a', fontSize: 10, fontWeight: 700 }}
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#52525b', fontSize: 10, fontWeight: 700 }}
+                    className="dark:[&_.recharts-cartesian-axis-tick_text]:fill-zinc-400"
                     interval={period === 'month' ? 4 : 0}
                   />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(99, 102, 241, 0.1)', radius: 8 }}
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '16px', fontSize: '12px', fontWeight: 'bold' }}
+                  <Tooltip
+                    cursor={{ fill: 'rgba(99, 102, 241, 0.08)', radius: 8 }}
+                    contentStyle={{
+                      backgroundColor: '#fafafa',
+                      border: '1px solid #e4e4e7',
+                      borderRadius: '16px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: '#18181b',
+                    }}
                   />
-                  <Bar dataKey="count" fill="#6366f1" radius={[6, 6, 0, 0]} barSize={period === 'month' ? 8 : 32} />
+                  <Legend
+                    wrapperStyle={{ fontSize: 10, fontWeight: 700 }}
+                    formatter={(value) => PILLAR_LABELS[lang][value as Pillar] ?? value}
+                  />
+                  {PILLARS.map((pillar) => (
+                    <Bar
+                      key={pillar}
+                      dataKey={pillar}
+                      stackId="pillars"
+                      fill={PILLAR_COLORS[pillar]}
+                      barSize={period === 'month' ? 8 : 28}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -213,26 +255,69 @@ export function Stats() {
             ) : (
               <div className="h-64 w-full min-h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={deedsByPillarData} layout="vertical" margin={{ left: 0, right: 30 }}>
+                  <BarChart data={deedsByPillarData} layout="vertical" margin={{ left: 4, right: 30 }}>
                     <XAxis type="number" hide />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#71717a', fontSize: 10, fontWeight: 600 }} 
-                      width={80}
+                    <YAxis
+                      dataKey="pillar"
+                      type="category"
+                      axisLine={false}
+                      tickLine={false}
+                      width={96}
+                      tick={(props: { x: number; y: number; payload: { value: Pillar } }) => {
+                        const { x, y, payload } = props;
+                        const p = payload.value;
+                        if (!PILLARS.includes(p)) return <g />;
+                        return (
+                          <text
+                            x={x}
+                            y={y}
+                            dy={4}
+                            textAnchor="end"
+                            fill={PILLAR_COLORS[p]}
+                            fontSize={11}
+                            fontWeight={800}
+                          >
+                            {PILLAR_LABELS[lang][p]}
+                          </text>
+                        );
+                      }}
                     />
-                    <Tooltip 
-                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                      contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '16px', fontSize: '12px', fontWeight: 'bold' }}
-                      formatter={(value: any) => [value, 'Total Deeds']}
+                    <Tooltip
+                      cursor={{ fill: 'rgba(99, 102, 241, 0.07)' }}
+                      content={({ active, payload: tipPayload }) => {
+                        if (!active || !tipPayload?.length) return null;
+                        const row = tipPayload[0].payload as { pillar: Pillar };
+                        const val = tipPayload[0].value;
+                        return (
+                          <div
+                            className={cn(
+                              'rounded-2xl border px-3 py-2.5 text-xs shadow-lg',
+                              'border-zinc-200 bg-white text-zinc-900',
+                              'dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50'
+                            )}
+                          >
+                            <p className="font-black leading-tight" style={{ color: PILLAR_COLORS[row.pillar] }}>
+                              {PILLAR_LABELS[lang][row.pillar]}
+                            </p>
+                            <p className="mt-1.5 font-bold text-zinc-800 dark:text-zinc-100">
+                              {t('statsTooltipDeeds')}: {val}
+                            </p>
+                          </div>
+                        );
+                      }}
                     />
                     <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={24}>
                       {deedsByPillarData.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={PILLAR_COLORS[entry.pillar as keyof typeof PILLAR_COLORS]} />
                       ))}
-                      <LabelList dataKey="count" position="right" offset={8} fill="#71717a" fontSize={10} fontWeight="black" />
+                      <LabelList
+                        dataKey="count"
+                        position="right"
+                        offset={8}
+                        className="fill-zinc-600 dark:fill-zinc-300"
+                        fontSize={10}
+                        fontWeight={800}
+                      />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -253,26 +338,70 @@ export function Stats() {
             ) : (
               <div className="h-64 w-full min-h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={durationByPillarData} layout="vertical" margin={{ left: 0, right: 30 }}>
+                  <BarChart data={durationByPillarData} layout="vertical" margin={{ left: 4, right: 30 }}>
                     <XAxis type="number" hide />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#71717a', fontSize: 10, fontWeight: 800 }} 
-                      width={80}
+                    <YAxis
+                      dataKey="pillar"
+                      type="category"
+                      axisLine={false}
+                      tickLine={false}
+                      width={96}
+                      tick={(props: { x: number; y: number; payload: { value: Pillar } }) => {
+                        const { x, y, payload } = props;
+                        const p = payload.value;
+                        if (!PILLARS.includes(p)) return <g />;
+                        return (
+                          <text
+                            x={x}
+                            y={y}
+                            dy={4}
+                            textAnchor="end"
+                            fill={PILLAR_COLORS[p]}
+                            fontSize={11}
+                            fontWeight={800}
+                          >
+                            {PILLAR_LABELS[lang][p]}
+                          </text>
+                        );
+                      }}
                     />
-                    <Tooltip 
-                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                      contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '16px', fontSize: '12px', fontWeight: 'bold', color: '#fff' }}
-                      formatter={(value: any) => [`${value} min`, 'Total Duration']}
+                    <Tooltip
+                      cursor={{ fill: 'rgba(99, 102, 241, 0.07)' }}
+                      content={({ active, payload: tipPayload }) => {
+                        if (!active || !tipPayload?.length) return null;
+                        const row = tipPayload[0].payload as { pillar: Pillar };
+                        const val = tipPayload[0].value;
+                        return (
+                          <div
+                            className={cn(
+                              'rounded-2xl border px-3 py-2.5 text-xs shadow-lg',
+                              'border-zinc-200 bg-white text-zinc-900',
+                              'dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50'
+                            )}
+                          >
+                            <p className="font-black leading-tight" style={{ color: PILLAR_COLORS[row.pillar] }}>
+                              {PILLAR_LABELS[lang][row.pillar]}
+                            </p>
+                            <p className="mt-1.5 font-bold text-zinc-800 dark:text-zinc-100">
+                              {t('statsTooltipDuration')}: {val} min
+                            </p>
+                          </div>
+                        );
+                      }}
                     />
                     <Bar dataKey="duration" radius={[0, 6, 6, 0]} barSize={24}>
                       {durationByPillarData.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={PILLAR_COLORS[entry.pillar as keyof typeof PILLAR_COLORS]} />
                       ))}
-                      <LabelList dataKey="duration" position="right" offset={8} fill="#71717a" fontSize={10} fontWeight="black" formatter={(val: any) => `${val}m`} />
+                      <LabelList
+                        dataKey="duration"
+                        position="right"
+                        offset={8}
+                        className="fill-zinc-600 dark:fill-zinc-300"
+                        fontSize={10}
+                        fontWeight={800}
+                        formatter={(val: number) => `${val}m`}
+                      />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -293,13 +422,13 @@ export function Stats() {
               ) : (
                 sortedFeelings.map(([feeling, count]) => (
                   <div key={feeling} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-zinc-300 capitalize">{feeling}</span>
-                      <span className="text-xs font-black text-zinc-500">{count}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200 capitalize truncate">{feeling}</span>
+                      <span className="text-xs font-black text-zinc-500 dark:text-zinc-400 shrink-0">{count}</span>
                     </div>
-                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-indigo-500 rounded-full transition-all duration-1000" 
+                    <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
                         style={{ width: `${((count as number) / deeds.length) * 100}%` }}
                       />
                     </div>
@@ -342,6 +471,7 @@ export function Stats() {
                 <DeedCard 
                   key={deed.id} 
                   deed={deed} 
+                  onEdit={setDeedToEdit}
                   onDelete={setDeedToDelete}
                 />
               ))
@@ -355,6 +485,7 @@ export function Stats() {
         onClose={() => setDeedToDelete(null)}
         onConfirm={handleDelete}
       />
+      <EditDeedDialog deed={deedToEdit} onClose={() => setDeedToEdit(null)} />
     </div>
   );
 }

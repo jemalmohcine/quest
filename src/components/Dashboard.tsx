@@ -8,9 +8,10 @@ import { Button } from './ui/button';
 import { DeleteDeedDialog } from './DeleteDeedDialog';
 import { Sparkles, User as UserIcon } from 'lucide-react';
 import { format, subDays } from 'date-fns';
-import { BarChart, Bar, XAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
-import { cn } from '../lib/utils';
+import { BarChart, Bar, XAxis, ResponsiveContainer, Cell, Tooltip, LabelList } from 'recharts';
+import { cn, sumPillarObjectives } from '../lib/utils';
 import { DeedCard } from './DeedCard';
+import { EditDeedDialog } from './EditDeedDialog';
 import { SectionHeader } from './SectionHeader';
 import { Skeleton } from './ui/skeleton';
 
@@ -22,6 +23,7 @@ export function Dashboard({ onTabChange }: {
   const [recentDeeds, setRecentDeeds] = useState<Deed[]>([]);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [deedToDelete, setDeedToDelete] = useState<Deed | null>(null);
+  const [deedToEdit, setDeedToEdit] = useState<Deed | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -53,14 +55,15 @@ export function Dashboard({ onTabChange }: {
     const weeklyQuery = query(deedsRef, where('date', '>=', last7Days[0]));
     const unsubscribeWeekly = onSnapshot(weeklyQuery, (snapshot) => {
       const deeds = snapshot.docs.map(doc => doc.data() as Deed);
-      
+      const loc = profile?.language || 'en';
+
       const data = PILLARS.map(pillar => {
         const count = deeds.filter(d => d.pillar === pillar).length;
         return {
-          name: PILLAR_LABELS['en'][pillar],
+          name: PILLAR_LABELS[loc][pillar],
           count: count,
           pillar: pillar,
-          objective: profile?.objectivePerPillar[pillar] || 1
+          objective: profile?.objectivePerPillar?.[pillar] || 1
         };
       });
       setWeeklyData(data);
@@ -78,8 +81,11 @@ export function Dashboard({ onTabChange }: {
   }, [user, profile]);
 
   const totalToday = todayDeeds.length;
-  const objectiveToday = profile?.dailyObjective || 5;
-  const progressPercent = Math.round((totalToday / objectiveToday) * 100);
+  const objectiveToday = profile
+    ? sumPillarObjectives(profile.objectivePerPillar) || profile.dailyObjective || 5
+    : 5;
+  const progressPercent = Math.min(100, Math.round((totalToday / Math.max(objectiveToday, 1)) * 100));
+  const dashLang = profile?.language || 'en';
 
   const handleDelete = async () => {
     if (!user || !deedToDelete?.id) return;
@@ -181,8 +187,8 @@ export function Dashboard({ onTabChange }: {
                         isDone ? "bg-white/20 backdrop-blur-md" : "bg-black/10"
                       )}>
                         <Icon className={cn("w-5 h-5", isDone ? "text-white" : "text-indigo-300/50")} />
-                        <span className="text-[10px] font-bold uppercase tracking-tighter text-white/80">
-                          {PILLAR_LABELS['en'][pillar].slice(0, 6)}
+                        <span className="text-[10px] font-bold uppercase tracking-tighter text-white/80 text-center leading-tight">
+                          {PILLAR_LABELS[dashLang][pillar].slice(0, 8)}
                         </span>
                       </div>
                     );
@@ -215,14 +221,31 @@ export function Dashboard({ onTabChange }: {
                         dataKey="name" 
                         hide
                       />
-                      <Tooltip 
-                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                        contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '16px', fontSize: '10px', fontWeight: 'bold' }}
+                      <Tooltip
+                        cursor={{ fill: 'rgba(99, 102, 241, 0.12)' }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          const row = payload[0].payload as { name: string; count: number };
+                          const v = payload[0].value as number;
+                          return (
+                            <div className="rounded-xl border border-zinc-500/50 bg-zinc-950 px-3 py-2 text-[10px] font-bold tracking-tight text-white shadow-lg">
+                              {row.name}: {v}
+                            </div>
+                          );
+                        }}
                       />
                       <Bar dataKey="count" radius={[6, 6, 6, 6]}>
                         {weeklyData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={PILLAR_COLORS[entry.pillar as keyof typeof PILLAR_COLORS]} />
                         ))}
+                        <LabelList
+                          dataKey="count"
+                          position="center"
+                          fill="#ffffff"
+                          fontSize={12}
+                          fontWeight={800}
+                          formatter={(v: number) => (v > 0 ? String(v) : '')}
+                        />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -274,6 +297,7 @@ export function Dashboard({ onTabChange }: {
               <DeedCard 
                 key={deed.id} 
                 deed={deed} 
+                onEdit={setDeedToEdit}
                 onDelete={setDeedToDelete}
                 showThought={false}
               />
@@ -286,6 +310,7 @@ export function Dashboard({ onTabChange }: {
           onClose={() => setDeedToDelete(null)}
           onConfirm={handleDelete}
         />
+        <EditDeedDialog deed={deedToEdit} onClose={() => setDeedToEdit(null)} />
       </section>
 
     </div>
