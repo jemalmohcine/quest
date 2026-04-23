@@ -5,7 +5,9 @@ import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <div className="flex min-h-0 w-full flex-1 flex-col">
+      <App />
+    </div>
   </StrictMode>,
 );
 

@@ -84,3 +84,36 @@ export function pillarDailyTarget(
   if (typeof v === 'number' && !Number.isNaN(v)) return Math.min(99, Math.max(0, v));
   return 1;
 }
+
+/**
+ * Actes qui comptent pour la journée : par pilier, min(nb d'actes, objectif du pilier).
+ * Les actes en trop dans un pilier ne font pas monter les autres.
+ */
+export function effectiveDeedsTowardDaily(
+  profile: { objectivePerPillar?: Partial<Record<Pillar, number>> | null; dailyObjective?: number } | null | undefined,
+  todayDeeds: { pillar: Pillar }[]
+): number {
+  const pillarSum = sumPillarObjectives(profile?.objectivePerPillar ?? undefined);
+  const target = dailyTargetFromProfile(profile);
+  if (pillarSum <= 0) {
+    return Math.min(todayDeeds.length, target);
+  }
+  let acc = 0;
+  for (const p of PILLARS) {
+    const t = pillarDailyTarget(profile, p);
+    if (t <= 0) continue;
+    const c = todayDeeds.filter((d) => d.pillar === p).length;
+    acc += Math.min(c, t);
+  }
+  return acc;
+}
+
+export function dailyProgressBreakdown(
+  profile: { objectivePerPillar?: Partial<Record<Pillar, number>> | null; dailyObjective?: number } | null | undefined,
+  todayDeeds: { pillar: Pillar }[]
+): { effective: number; target: number; percent: number } {
+  const target = dailyTargetFromProfile(profile);
+  const effective = effectiveDeedsTowardDaily(profile, todayDeeds);
+  const percent = Math.min(100, Math.round((effective / Math.max(target, 1)) * 100));
+  return { effective, target, percent };
+}

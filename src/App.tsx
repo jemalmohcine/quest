@@ -60,7 +60,7 @@ function AppContent() {
             <LandingPage onGetStarted={() => setShowAuth(true)} />
           )
         ) : (
-          <div className="flex h-dvh min-h-0 w-full overflow-hidden bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-white">
+          <div className="flex min-h-0 min-h-dvh w-full flex-1 overflow-hidden bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-white">
             {/* Desktop Sidebar */}
             <aside className="hidden md:flex flex-col w-64 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-xl">
               <div className="p-6">
@@ -119,7 +119,7 @@ function AppContent() {
 
             {/* Main Content */}
             <div className="relative flex min-h-0 flex-1 flex-col bg-zinc-50/30 dark:bg-zinc-950">
-              <main className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain pt-2 pb-24 [-webkit-overflow-scrolling:touch] md:pb-8">
+              <main className="min-h-0 flex-1 overflow-y-scroll overscroll-y-auto pt-2 pb-24 [-webkit-overflow-scrolling:touch] md:pb-8">
                 <div className="max-w-6xl mx-auto px-4 md:px-8">
                   {activeTab === 'dashboard' && (
                     <Dashboard 

@@ -9,7 +9,7 @@ import { DeleteDeedDialog } from './DeleteDeedDialog';
 import { Sparkles, User as UserIcon } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell, Tooltip, LabelList } from 'recharts';
-import { cn, dailyTargetFromProfile, pillarDailyTarget } from '../lib/utils';
+import { cn, dailyProgressBreakdown, pillarDailyTarget } from '../lib/utils';
 import { DeedCard } from './DeedCard';
 import { EditDeedDialog } from './EditDeedDialog';
 import { SectionHeader } from './SectionHeader';
@@ -81,8 +81,11 @@ export function Dashboard({ onTabChange }: {
   }, [user, profile]);
 
   const totalToday = todayDeeds.length;
-  const dailyTarget = dailyTargetFromProfile(profile);
-  const progressPercent = Math.min(100, Math.round((totalToday / Math.max(dailyTarget, 1)) * 100));
+  const { effective: progressEffective, target: dailyTarget, percent: progressPercent } = dailyProgressBreakdown(
+    profile,
+    todayDeeds
+  );
+  const dailyGoalComplete = progressPercent >= 100;
   const dashLang = profile?.language || 'en';
 
   const handleDelete = async () => {
@@ -141,10 +144,15 @@ export function Dashboard({ onTabChange }: {
                   <div className="space-y-2">
                     <h2 className="text-indigo-100 text-sm font-semibold uppercase tracking-widest">{t('dailyProgress')}</h2>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-6xl font-black text-white">{totalToday}</span>
+                      <span className="text-6xl font-black text-white">{progressEffective}</span>
                       <span className="text-2xl font-medium text-indigo-200">/ {dailyTarget}</span>
                     </div>
-                    <p className="text-indigo-100/80 font-medium">{t('deedsCompleted')}</p>
+                    <p className="text-indigo-100/80 font-medium">{t('deedsCompletedTowardGoal')}</p>
+                    {totalToday > progressEffective && (
+                      <p className="text-xs font-semibold text-indigo-200/90">
+                        {t('deedsTotalToday')}: {totalToday}
+                      </p>
+                    )}
                   </div>
                   
                   <div className="relative w-32 h-32 flex items-center justify-center">
@@ -174,6 +182,21 @@ export function Dashboard({ onTabChange }: {
                     <span className="absolute text-xl font-bold text-white">{progressPercent}%</span>
                   </div>
                 </div>
+
+                {dailyGoalComplete && (
+                  <div
+                    className={cn(
+                      'mt-8 flex items-start gap-3 rounded-2xl border border-white/25 bg-white/15 p-4 backdrop-blur-md',
+                      'animate-in fade-in duration-500'
+                    )}
+                  >
+                    <Sparkles className="mt-0.5 h-6 w-6 shrink-0 text-amber-200" />
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-sm font-black uppercase tracking-wide text-white">{t('dailyGoalCompleteTitle')}</p>
+                      <p className="text-sm font-medium leading-snug text-indigo-50">{t('dailyGoalCompleteMessage')}</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-12 grid grid-cols-2 sm:grid-cols-5 gap-4">
                   {PILLARS.map(pillar => {
@@ -219,7 +242,7 @@ export function Dashboard({ onTabChange }: {
               </div>
             ) : (
               <>
-                <div className="h-48 min-h-[200px] w-full touch-pan-y">
+                <div className="h-48 min-h-[200px] w-full max-md:pointer-events-none">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={weeklyData}>
                       <XAxis 
