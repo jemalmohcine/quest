@@ -9,7 +9,7 @@ import { DeleteDeedDialog } from './DeleteDeedDialog';
 import { Sparkles, User as UserIcon } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell, Tooltip, LabelList } from 'recharts';
-import { cn, sumPillarObjectives } from '../lib/utils';
+import { cn, dailyTargetFromProfile, pillarDailyTarget } from '../lib/utils';
 import { DeedCard } from './DeedCard';
 import { EditDeedDialog } from './EditDeedDialog';
 import { SectionHeader } from './SectionHeader';
@@ -81,10 +81,8 @@ export function Dashboard({ onTabChange }: {
   }, [user, profile]);
 
   const totalToday = todayDeeds.length;
-  const objectiveToday = profile
-    ? sumPillarObjectives(profile.objectivePerPillar) || profile.dailyObjective || 5
-    : 5;
-  const progressPercent = Math.min(100, Math.round((totalToday / Math.max(objectiveToday, 1)) * 100));
+  const dailyTarget = dailyTargetFromProfile(profile);
+  const progressPercent = Math.min(100, Math.round((totalToday / Math.max(dailyTarget, 1)) * 100));
   const dashLang = profile?.language || 'en';
 
   const handleDelete = async () => {
@@ -144,7 +142,7 @@ export function Dashboard({ onTabChange }: {
                     <h2 className="text-indigo-100 text-sm font-semibold uppercase tracking-widest">{t('dailyProgress')}</h2>
                     <div className="flex items-baseline gap-2">
                       <span className="text-6xl font-black text-white">{totalToday}</span>
-                      <span className="text-2xl font-medium text-indigo-200">/ {objectiveToday}</span>
+                      <span className="text-2xl font-medium text-indigo-200">/ {dailyTarget}</span>
                     </div>
                     <p className="text-indigo-100/80 font-medium">{t('deedsCompleted')}</p>
                   </div>
@@ -180,16 +178,23 @@ export function Dashboard({ onTabChange }: {
                 <div className="mt-12 grid grid-cols-2 sm:grid-cols-5 gap-4">
                   {PILLARS.map(pillar => {
                     const Icon = PILLAR_ICONS[pillar];
-                    const isDone = todayDeeds.some(d => d.pillar === pillar);
+                    const target = pillarDailyTarget(profile, pillar);
+                    const countToday = todayDeeds.filter((d) => d.pillar === pillar).length;
+                    const isDone = target > 0 && countToday >= target;
                     return (
                       <div key={pillar} className={cn(
-                        "flex flex-col items-center gap-2 p-3 rounded-2xl transition-all",
+                        "flex flex-col items-center gap-1.5 p-3 rounded-2xl transition-all",
                         isDone ? "bg-white/20 backdrop-blur-md" : "bg-black/10"
                       )}>
                         <Icon className={cn("w-5 h-5", isDone ? "text-white" : "text-indigo-300/50")} />
                         <span className="text-[10px] font-bold uppercase tracking-tighter text-white/80 text-center leading-tight">
                           {PILLAR_LABELS[dashLang][pillar].slice(0, 8)}
                         </span>
+                        {target > 0 && (
+                          <span className="text-[9px] font-black tabular-nums text-white/70">
+                            {countToday}/{target}
+                          </span>
+                        )}
                       </div>
                     );
                   })}

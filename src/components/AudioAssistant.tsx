@@ -352,18 +352,37 @@ Language for actionName and thought: ${lang}.`;
         }
       }}
     >
-      <DialogContent className={cn("bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white sm:max-w-[425px] p-0 overflow-hidden max-h-[90vh] overflow-y-auto", UI_CONSTANTS.cardRadius)}>
-        <div className="bg-indigo-600 p-6 flex items-center gap-4">
-          <div className={cn("w-12 h-12 bg-white/20 flex items-center justify-center backdrop-blur-sm", UI_CONSTANTS.buttonRadius)}>
-            <Mic className="w-6 h-6 text-white" />
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          'flex max-h-[min(92dvh,calc(100dvh-1rem))] w-full flex-col gap-0 overflow-y-auto overflow-x-hidden overscroll-y-contain border-zinc-200 bg-white p-0 touch-pan-y [-webkit-overflow-scrolling:touch] text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white sm:max-w-[425px]',
+          UI_CONSTANTS.cardRadius
+        )}
+      >
+        <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 bg-indigo-600 p-6 shadow-sm">
+          <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center bg-white/20 backdrop-blur-sm', UI_CONSTANTS.buttonRadius)}>
+            <Mic className="h-6 w-6 text-white" />
           </div>
-          <div>
-            <DialogTitle className="text-xl font-bold text-white tracking-tight leading-none">{t('audioAssistant')}</DialogTitle>
-            <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mt-1">{t('audioAssistantTagline')}</p>
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="text-xl font-bold leading-none tracking-tight text-white">{t('audioAssistant')}</DialogTitle>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-indigo-100">{t('audioAssistantTagline')}</p>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              resetFlow();
+              onClose();
+            }}
+            className="h-11 w-11 shrink-0 rounded-xl text-white hover:bg-white/15"
+            aria-label={t('cancel')}
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
-        <div className="p-8 flex flex-col items-center justify-center space-y-8">
+        <div className="flex flex-col items-center justify-center space-y-8 p-6 md:p-8">
           {!extractedDeed && !isProcessing && (
             <div className="flex flex-col items-center space-y-6 w-full">
               <div className="relative">
@@ -414,7 +433,12 @@ Language for actionName and thought: ${lang}.`;
                     value={reviewDraft.pillar}
                     onValueChange={(v) => v && setReviewDraft((d) => d ? { ...d, pillar: v as Pillar } : d)}
                   >
-                    <SelectTrigger className={cn("bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700", UI_CONSTANTS.buttonRadius)}>
+                    <SelectTrigger
+                      className={cn(
+                        'box-border h-11 min-h-11 w-full border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900',
+                        UI_CONSTANTS.buttonRadius
+                      )}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white">
@@ -432,12 +456,15 @@ Language for actionName and thought: ${lang}.`;
                   <Input
                     value={reviewDraft.actionName}
                     onChange={(e) => setReviewDraft((d) => d ? { ...d, actionName: e.target.value } : d)}
-                    className={cn("font-bold", UI_CONSTANTS.buttonRadius)}
+                    className={cn(
+                      'box-border h-11 min-h-11 max-h-11 py-0 font-bold leading-none dark:bg-zinc-950',
+                      UI_CONSTANTS.buttonRadius
+                    )}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('duration')}</Label>
                     <Input
                       type="number"
@@ -446,16 +473,25 @@ Language for actionName and thought: ${lang}.`;
                       placeholder=""
                       value={reviewDraft.duration}
                       onChange={(e) => setReviewDraft((d) => d ? { ...d, duration: e.target.value } : d)}
-                      className={UI_CONSTANTS.buttonRadius}
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                      className={cn(
+                        'box-border h-11 min-h-11 max-h-11 w-full py-0 leading-none tabular-nums dark:bg-zinc-950',
+                        UI_CONSTANTS.buttonRadius
+                      )}
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('feeling')}</Label>
                     <Select
                       value={reviewDraft.feeling}
                       onValueChange={(v) => v && setReviewDraft((d) => d ? { ...d, feeling: v } : d)}
                     >
-                      <SelectTrigger className={cn("bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700", UI_CONSTANTS.buttonRadius)}>
+                      <SelectTrigger
+                        className={cn(
+                          'box-border h-11 min-h-11 w-full border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900',
+                          UI_CONSTANTS.buttonRadius
+                        )}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white">

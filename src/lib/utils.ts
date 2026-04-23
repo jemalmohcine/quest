@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { format, getWeek, getYear } from 'date-fns';
+import { PILLARS, type Pillar } from '../types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -52,6 +53,34 @@ export function deedFieldsFromDateAndTime(dateStr: string, timeStr: string) {
   };
 }
 
-export function sumPillarObjectives(objectives: Record<string, number>): number {
-  return Object.values(objectives).reduce((a, b) => a + (Number(b) || 0), 0);
+/** Somme des objectifs quotidiens par pilier (toujours les 5 piliers, manquant = 0). */
+export function sumPillarObjectives(
+  objectives: Partial<Record<Pillar, number>> | Record<string, number> | undefined | null
+): number {
+  if (!objectives) return 0;
+  return PILLARS.reduce((sum, p) => {
+    const n = Number((objectives as Record<string, number>)[p]);
+    return sum + (Number.isNaN(n) ? 0 : Math.max(0, Math.min(99, n)));
+  }, 0);
+}
+
+/** Total « actes pour 100 % » : somme des objectifs par pilier depuis les réglages, sinon `dailyObjective`. */
+export function dailyTargetFromProfile(
+  profile: { objectivePerPillar?: Partial<Record<Pillar, number>> | null; dailyObjective?: number } | null | undefined
+): number {
+  if (!profile) return 5;
+  const fromPillars = sumPillarObjectives(profile.objectivePerPillar ?? undefined);
+  if (fromPillars > 0) return fromPillars;
+  const d = profile.dailyObjective;
+  if (typeof d === 'number' && d > 0) return d;
+  return 5;
+}
+
+export function pillarDailyTarget(
+  profile: { objectivePerPillar?: Partial<Record<Pillar, number>> | null } | null | undefined,
+  pillar: Pillar
+): number {
+  const v = profile?.objectivePerPillar?.[pillar];
+  if (typeof v === 'number' && !Number.isNaN(v)) return Math.min(99, Math.max(0, v));
+  return 1;
 }

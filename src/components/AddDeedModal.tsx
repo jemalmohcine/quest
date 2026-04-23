@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { cn, deedFieldsFromDateAndTime } from '../lib/utils';
 import { UI_CONSTANTS } from '../constants';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { enUS, fr } from 'date-fns/locale';
 import { DeedDateTimeComboField } from './DeedDateTimeFields';
@@ -152,20 +152,31 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
+        showCloseButton={false}
         className={cn(
           'flex w-full max-h-[min(92dvh,calc(100dvh-1rem))] flex-col gap-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-white p-0 touch-pan-y [-webkit-overflow-scrolling:touch] dark:border-zinc-800 dark:bg-zinc-900 dark:text-white sm:max-w-[425px]',
           'border-zinc-200 text-zinc-900',
           UI_CONSTANTS.cardRadius
         )}
       >
-        <div className="sticky top-0 z-10 flex shrink-0 items-center gap-4 bg-indigo-600 p-6 pr-14 shadow-sm">
+        <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 bg-indigo-600 p-6 shadow-sm">
           <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center bg-white/20 backdrop-blur-sm', UI_CONSTANTS.buttonRadius)}>
             <Sparkles className="h-6 w-6 text-white" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <DialogTitle className="text-xl font-bold leading-none tracking-tight text-white">{t('logDeed')}</DialogTitle>
             <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-indigo-100">{t('logDeedTagline')}</p>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-11 w-11 shrink-0 rounded-xl text-white hover:bg-white/15"
+            aria-label={t('cancel')}
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
         <form
