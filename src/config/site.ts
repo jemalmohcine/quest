@@ -12,7 +12,7 @@ function resolvePublicSiteUrl(): string {
 
 export const siteConfig = {
   name: 'Quest',
-  title: 'Quest — Suivi des actes & cinq piliers',
+  title: 'Quest',
   description:
     'Quest t’aide à enregistrer tes actes quotidiens autour de cinq piliers (âme, corps, esprit, compétences, cœur), visualiser ta progression et générer des résumés hebdomadaires.',
   keywords: [

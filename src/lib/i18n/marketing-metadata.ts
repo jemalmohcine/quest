@@ -34,7 +34,7 @@ export function marketingHomeAlternates(locale: MarketingLocale): NonNullable<Me
 export function marketingHomeMetadata(locale: MarketingLocale): Metadata {
   const m = getMarketingCopy(locale);
   return {
-    title: m.metaTitle,
+    title: { absolute: m.metaTitle },
     description: m.metaDescription,
     alternates: marketingHomeAlternates(locale),
     openGraph: {
@@ -58,20 +58,20 @@ function subMeta(locale: MarketingLocale, segment: MarketingSegment, title: stri
 
 export function marketingContactMetadata(locale: MarketingLocale): Metadata {
   const m = getMarketingCopy(locale);
-  return subMeta(locale, 'contact', `${m.contact.title} · ${siteConfig.name}`, m.contact.intro);
+  return subMeta(locale, 'contact', m.contact.title, m.contact.intro);
 }
 
 export function marketingPrivacyMetadata(locale: MarketingLocale): Metadata {
   const m = getMarketingCopy(locale);
-  return subMeta(locale, 'privacy', `${m.privacy.title} · ${siteConfig.name}`, m.privacy.sections[0]?.p ?? m.metaDescription);
+  return subMeta(locale, 'privacy', m.privacy.title, m.privacy.sections[0]?.p ?? m.metaDescription);
 }
 
 export function marketingTermsMetadata(locale: MarketingLocale): Metadata {
   const m = getMarketingCopy(locale);
-  return subMeta(locale, 'terms', `${m.terms.title} · ${siteConfig.name}`, m.terms.sections[0]?.p ?? m.metaDescription);
+  return subMeta(locale, 'terms', m.terms.title, m.terms.sections[0]?.p ?? m.metaDescription);
 }
 
 export function marketingMethodMetadata(locale: MarketingLocale): Metadata {
   const m = getMarketingCopy(locale);
-  return subMeta(locale, 'scientific-method', `${m.method.title} · ${siteConfig.name}`, m.method.sections[0]?.p ?? m.metaDescription);
+  return subMeta(locale, 'scientific-method', m.method.title, m.method.sections[0]?.p ?? m.metaDescription);
 }

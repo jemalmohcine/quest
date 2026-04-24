@@ -95,7 +95,7 @@ export const marketingCopy: Record<MarketingLocale, MarketingCopy> = {
   fr: {
     htmlLang: 'fr',
     jsonLdLang: 'fr-FR',
-    metaTitle: 'Quest — Journal d’actes & cinq piliers',
+    metaTitle: 'Quest',
     metaDescription:
       'Enregistre tes actes quotidiens (durée, ressenti, pilier), fixe des objectifs par pilier, visualise ta progression et génère des résumés de semaine.',
     nav: {
@@ -303,7 +303,7 @@ export const marketingCopy: Record<MarketingLocale, MarketingCopy> = {
   en: {
     htmlLang: 'en',
     jsonLdLang: 'en-US',
-    metaTitle: 'Quest — Deed log & five life pillars',
+    metaTitle: 'Quest',
     metaDescription:
       'Log daily deeds (duration, feeling, pillar), set per-pillar goals, see your progress on a dashboard, and generate weekly summaries.',
     nav: {

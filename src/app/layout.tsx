@@ -24,6 +24,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
+  applicationName: siteConfig.name,
   title: {
     default: siteConfig.title,
     template: `%s · ${siteConfig.name}`,
@@ -32,6 +33,7 @@ export const metadata: Metadata = {
   keywords: [...siteConfig.keywords],
   authors: [{ name: siteConfig.name }],
   creator: siteConfig.name,
+  manifest: '/manifest.json',
   openGraph: {
     type: 'website',
     locale: siteConfig.locale,
