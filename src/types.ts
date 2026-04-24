@@ -1,42 +1,42 @@
-import { Timestamp } from 'firebase/firestore';
-
 export type Pillar = 'soulset' | 'healthset' | 'mindset' | 'skillset' | 'heartset';
 
-export type Feeling = 
-  | 'happy' 
-  | 'confident' 
-  | 'frustrated' 
-  | 'neutral' 
-  | 'energized' 
-  | 'calm' 
-  | 'motivated' 
-  | 'peaceful' 
-  | 'tired' 
+export type Feeling =
+  | 'happy'
+  | 'confident'
+  | 'frustrated'
+  | 'neutral'
+  | 'energized'
+  | 'calm'
+  | 'motivated'
+  | 'peaceful'
+  | 'tired'
   | 'focused';
 
 export interface UserProfile {
   email: string;
   name: string;
-  createdAt: Timestamp;
+  createdAt: string;
   language: 'en' | 'fr';
   theme: 'light' | 'dark' | 'system';
   /** Somme des objectifs par pilier (affichage / compat). */
   dailyObjective: number;
   objectivePerPillar: Record<Pillar, number>;
-  /** Sentiments supplémentaires saisis par l’utilisateur (slug lowercase). */
+  /** Sentiments supplémentaires saisis par l'utilisateur (slug lowercase). */
   customFeelings?: string[];
   photoURL?: string;
 }
 
 export interface Deed {
   id?: string;
+  user_id?: string;
   pillar: Pillar;
   actionName: string;
   duration?: number | null;
   thought?: string | null;
   /** Préréglages + sentiments personnalisés du profil. */
   feeling: string;
-  createdAt: Timestamp;
+  /** Horodatage ISO côté Supabase (`created_at`). */
+  createdAt?: string;
   date: string; // YYYY-MM-DD
   week: number;
   month: string; // YYYY-MM
@@ -56,7 +56,7 @@ export const FEELINGS: Feeling[] = [
   'motivated',
   'peaceful',
   'tired',
-  'focused'
+  'focused',
 ];
 
 export const PILLAR_COLORS: Record<Pillar, string> = {
@@ -81,5 +81,5 @@ export const PILLAR_LABELS: Record<string, Record<Pillar, string>> = {
     mindset: 'Mindset',
     skillset: 'Skillset',
     heartset: 'Heartset',
-  }
+  },
 };

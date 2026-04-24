@@ -1,0 +1,25 @@
+/**
+ * Design system — variables sémantiques (thème clair/sombre via .dark sur <html>).
+ * Durées et courbes : utilisées par motion / transitions Tailwind.
+ */
+:root {
+  --ds-motion-in: 320ms;
+  --ds-motion-out: 220ms;
+  --ds-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ds-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ds-focus-ring: 2px solid oklch(0.55 0.2 270);
+  --ds-focus-offset: 2px;
+  --ds-surface-glow: 0 0 40px oklch(0.65 0.15 270 / 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ds-motion-in: 0.01ms;
+    --ds-motion-out: 0.01ms;
+  }
+}
+
+.dark {
+  --ds-focus-ring: 2px solid oklch(0.72 0.15 270);
+  --ds-surface-glow: 0 0 48px oklch(0.55 0.2 270 / 0.2);
+}

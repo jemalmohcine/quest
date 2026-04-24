@@ -1,0 +1,519 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useQuest } from './QuestProvider';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Mic, Square, Loader2, Check, X } from 'lucide-react';
+import { PILLARS, Pillar, PILLAR_LABELS, UserProfile } from '@/types';
+import { questHttp } from '@/services/quest-http';
+import { cn, createDeedMetadata } from '@/lib/utils';
+import { allFeelingOptions, normalizeFeelingKey } from '@/lib/feelings';
+import { UI_CONSTANTS } from '@/constants';
+import { useDeedsRefreshStore } from '@/stores';
+import { clientApiUrl } from '@/lib/client-api-url';
+
+interface AudioAssistantProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+type ReviewDraft = {
+  pillar: Pillar;
+  actionName: string;
+  duration: string;
+  feeling: string;
+  thought: string;
+};
+
+function normalizeAiPayload(raw: Record<string, unknown>, profile: UserProfile | null | undefined) {
+  const pillar =
+    typeof raw.pillar === 'string' && PILLARS.includes(raw.pillar as Pillar)
+      ? (raw.pillar as Pillar)
+      : 'mindset';
+  const actionName = typeof raw.actionName === 'string' ? raw.actionName.trim() : '';
+  let duration: number | null = null;
+  if (raw.duration != null && raw.duration !== '') {
+    const n = Number(raw.duration);
+    if (!Number.isNaN(n) && n >= 0) duration = n;
+  }
+  const allowed = new Set(allFeelingOptions(profile));
+  let feeling = 'neutral';
+  if (typeof raw.feeling === 'string' && raw.feeling.trim()) {
+    const keyed = normalizeFeelingKey(raw.feeling);
+    const lower = raw.feeling.trim().toLowerCase();
+    if (allowed.has(keyed)) feeling = keyed;
+    else if (allowed.has(lower)) feeling = lower;
+  }
+  const thought = typeof raw.thought === 'string' ? raw.thought.trim() : '';
+  return { pillar, actionName, duration, feeling, thought };
+}
+
+function toReviewDraft(n: ReturnType<typeof normalizeAiPayload>): ReviewDraft {
+  return {
+    pillar: n.pillar,
+    actionName: n.actionName,
+    duration: n.duration != null ? String(n.duration) : '',
+    feeling: n.feeling,
+    thought: n.thought,
+  };
+}
+
+export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
+  const { user, profile, t } = useQuest();
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [extractedDeed, setExtractedDeed] = useState<ReturnType<typeof normalizeAiPayload> | null>(null);
+  const feelingChoices = allFeelingOptions(profile);
+  const [reviewDraft, setReviewDraft] = useState<ReviewDraft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordStartedAtRef = useRef<number>(0);
+
+  /** WebKit / PWA: periodic chunks; stop mic tracks only after recorder finishes (avoids empty blobs). */
+  const RECORD_TIMESLICE_MS = 250;
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.requestData();
+        } catch {
+          /* */
+        }
+        mediaRecorderRef.current.stop();
+      }
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+    };
+  }, []);
+
+  const resetFlow = useCallback(() => {
+    setExtractedDeed(null);
+    setReviewDraft(null);
+    setError(null);
+    setIsProcessing(false);
+    setIsSaving(false);
+  }, []);
+
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      resetFlow();
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, resetFlow]);
+
+  const pickRecorderMimeType = (): string | undefined => {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const candidates = isIOS
+      ? ['audio/mp4', 'audio/webm', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus']
+      : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+    for (const c of candidates) {
+      if (MediaRecorder.isTypeSupported(c)) return c;
+    }
+    return undefined;
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+      const mime = pickRecorderMimeType();
+      const mediaRecorder = mime
+        ? new MediaRecorder(stream, { mimeType: mime })
+        : new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      setRecordingSeconds(0);
+      recordStartedAtRef.current = Date.now();
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const streamToStop = recordingStreamRef.current;
+        recordingStreamRef.current = null;
+        if (streamToStop) {
+          streamToStop.getTracks().forEach((track) => track.stop());
+        }
+        mediaRecorderRef.current = null;
+
+        const elapsedMs = Date.now() - recordStartedAtRef.current;
+        const blobType = mediaRecorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
+        const minMs = 600;
+        const minBytes = 64;
+        if (elapsedMs < minMs) {
+          setError(t('recordingTooShort'));
+          return;
+        }
+        if (audioBlob.size < minBytes) {
+          setError(t('recordingTooShort'));
+          return;
+        }
+        processAudio(audioBlob);
+      };
+
+      mediaRecorder.start(RECORD_TIMESLICE_MS);
+      setIsRecording(true);
+      setError(null);
+
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds(prev => {
+          if (prev >= 59) {
+            stopRecording();
+            return 60;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      setError(t('audioError'));
+    }
+  };
+
+  const stopRecording = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state === 'recording') {
+      try {
+        mr.requestData();
+      } catch {
+        /* older Safari */
+      }
+      mr.stop();
+    }
+    setIsRecording(false);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const processAudio = async (blob: Blob) => {
+    setIsProcessing(true);
+    setError(null);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+        try {
+          const base64Data = (reader.result as string).split(',')[1];
+          const res = await fetch(clientApiUrl('/api/v1/gemini/extract-deed'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mimeType: blob.type || 'audio/webm',
+              audioBase64: base64Data,
+              language: profile?.language === 'fr' ? 'fr' : 'en',
+              feelingChoices,
+            }),
+          });
+          const payload = (await res.json()) as { data?: Record<string, unknown>; error?: string };
+          if (!res.ok) {
+            throw new Error(typeof payload.error === 'string' ? payload.error : 'Gemini request failed');
+          }
+          const parsed = payload.data;
+          if (!parsed || typeof parsed !== 'object') {
+            throw new Error('Invalid response from server');
+          }
+          const normalized = normalizeAiPayload(parsed, profile);
+          setExtractedDeed(normalized);
+          setReviewDraft(toReviewDraft(normalized));
+          setIsProcessing(false);
+        } catch (innerErr: unknown) {
+          console.error("Gemini API Error:", innerErr);
+          const msg = innerErr instanceof Error ? innerErr.message : t('audioError');
+          setError(msg);
+          setIsProcessing(false);
+        }
+      };
+    } catch (err) {
+      setError(t('audioError'));
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user || !reviewDraft) return;
+
+    const title = reviewDraft.actionName.trim();
+    if (!title) {
+      setError(t('actionNameRequired'));
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      const meta = createDeedMetadata();
+      const payload = {
+        pillar: reviewDraft.pillar,
+        actionName: title,
+        feeling: reviewDraft.feeling,
+        dateStr: meta.date,
+        timeStr: meta.time,
+        ...(reviewDraft.duration.trim()
+          ? (() => {
+              const d = parseInt(reviewDraft.duration, 10);
+              return !Number.isNaN(d) && d >= 0 ? { duration: d } : {};
+            })()
+          : {}),
+        ...(reviewDraft.thought.trim() ? { thought: reviewDraft.thought.trim() } : {}),
+      };
+
+      const { error } = await questHttp.createDeed(payload);
+      if (error) throw new Error(error.message);
+      useDeedsRefreshStore.getState().bumpDeedsRefresh();
+      resetFlow();
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setError(t('saveDeedFailed'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const lang = profile?.language || 'en';
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          resetFlow();
+          onClose();
+        }
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          'flex max-h-[min(92dvh,calc(100dvh-1rem))] w-full flex-col gap-0 overflow-y-auto overflow-x-hidden overscroll-y-contain border-zinc-200 bg-white p-0 touch-pan-y [-webkit-overflow-scrolling:touch] text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white sm:max-w-[425px]',
+          UI_CONSTANTS.cardRadius
+        )}
+      >
+        <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 bg-indigo-600 p-6 shadow-sm">
+          <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center bg-white/20 backdrop-blur-sm', UI_CONSTANTS.buttonRadius)}>
+            <Mic className="h-6 w-6 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="text-xl font-bold leading-none tracking-tight text-white">{t('audioAssistant')}</DialogTitle>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-indigo-100">{t('audioAssistantTagline')}</p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              resetFlow();
+              onClose();
+            }}
+            className="h-11 w-11 shrink-0 rounded-xl text-white hover:bg-white/15"
+            aria-label={t('cancel')}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <div className="flex flex-col items-center justify-center space-y-8 p-6 md:p-8">
+          {!extractedDeed && !isProcessing && (
+            <div className="flex flex-col items-center space-y-6 w-full">
+              <div className="relative">
+                {isRecording && (
+                  <div className="absolute inset-0 bg-indigo-500/20 rounded-full animate-ping" />
+                )}
+                <Button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className={cn(
+                    "w-24 h-24 rounded-full shadow-2xl transition-all active:scale-90 relative z-10",
+                    isRecording
+                      ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
+                      : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20'
+                  )}
+                >
+                  {isRecording ? <Square className="w-8 h-8 fill-white" /> : <Mic className="w-10 h-10" />}
+                </Button>
+              </div>
+              <div className="text-center space-y-2">
+                <p className="font-bold text-zinc-900 dark:text-white text-lg tracking-tight">
+                  {isRecording ? t('listening') : t('tapToSpeak')}
+                </p>
+                {isRecording && (
+                  <p className="text-indigo-600 dark:text-indigo-400 font-mono text-2xl font-black animate-pulse">
+                    {formatTime(recordingSeconds)}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isProcessing && (
+            <div className="flex flex-col items-center space-y-4 py-8">
+              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+              <p className="font-bold text-zinc-500 dark:text-zinc-400 text-sm italic">{t('processingAudio')}</p>
+            </div>
+          )}
+
+          {extractedDeed && reviewDraft && !isProcessing && (
+            <div className="w-full space-y-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('deedExtracted')}</p>
+              <p className="text-xs text-zinc-500">{t('actionNameHint')}</p>
+
+              <div className={cn("p-6 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 space-y-4", UI_CONSTANTS.cardRadius)}>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('pillar')}</Label>
+                  <Select
+                    value={reviewDraft.pillar}
+                    onValueChange={(v) => v && setReviewDraft((d) => d ? { ...d, pillar: v as Pillar } : d)}
+                  >
+                    <SelectTrigger
+                      className={cn(
+                        'box-border h-11 min-h-11 w-full border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900',
+                        UI_CONSTANTS.buttonRadius
+                      )}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white">
+                      {PILLARS.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {PILLAR_LABELS[lang][p]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('actionName')}</Label>
+                  <Input
+                    value={reviewDraft.actionName}
+                    onChange={(e) => setReviewDraft((d) => d ? { ...d, actionName: e.target.value } : d)}
+                    className={cn(
+                      'box-border h-11 min-h-11 max-h-11 py-0 font-bold leading-none dark:bg-zinc-950',
+                      UI_CONSTANTS.buttonRadius
+                    )}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('duration')}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      placeholder=""
+                      value={reviewDraft.duration}
+                      onChange={(e) => setReviewDraft((d) => d ? { ...d, duration: e.target.value } : d)}
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                      className={cn(
+                        'box-border h-11 min-h-11 max-h-11 w-full py-0 leading-none tabular-nums dark:bg-zinc-950',
+                        UI_CONSTANTS.buttonRadius
+                      )}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('feeling')}</Label>
+                    <Select
+                      value={reviewDraft.feeling}
+                      onValueChange={(v) => v && setReviewDraft((d) => d ? { ...d, feeling: v } : d)}
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          'box-border h-11 min-h-11 w-full border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900',
+                          UI_CONSTANTS.buttonRadius
+                        )}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white">
+                        {feelingChoices.map((f) => (
+                          <SelectItem key={f} value={f}>{f}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('thought')}</Label>
+                  <Textarea
+                    value={reviewDraft.thought}
+                    onChange={(e) => setReviewDraft((d) => d ? { ...d, thought: e.target.value } : d)}
+                    rows={2}
+                    className={cn("resize-none text-sm", UI_CONSTANTS.buttonRadius)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetFlow}
+                  disabled={isSaving}
+                  className={cn("flex-1 h-12 border-zinc-200 dark:border-zinc-800 font-bold uppercase text-[10px] tracking-widest transition-transform active:scale-95 hover:bg-zinc-100", UI_CONSTANTS.buttonRadius)}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  {t('reRecordAudio')}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className={cn("flex-1 h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-500/20 uppercase text-[10px] tracking-widest transition-transform active:scale-95", UI_CONSTANTS.buttonRadius)}
+                >
+                  {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                  {t('saveDeed')}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className={cn("w-full p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest text-center", UI_CONSTANTS.cardRadius)}>
+              {error}
+              <Button
+                variant="link"
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  if (!extractedDeed) setIsProcessing(false);
+                }}
+                className="block mx-auto mt-2 text-red-600 dark:text-red-400 font-black uppercase text-[10px]"
+              >
+                {t('tryAgain')}
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
