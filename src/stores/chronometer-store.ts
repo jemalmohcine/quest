@@ -12,6 +12,7 @@ type PersistedChrono = {
   paused: boolean;
   pauseStartedAt: number | null;
   hasSession: boolean;
+  frozenElapsedMs: number | null;
 };
 
 export function computeChronoElapsedMs(
@@ -39,7 +40,8 @@ export function loadChronoFromStorage(): PersistedChrono | null {
   try {
     const raw = localStorage.getItem(CHRONO_STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as PersistedChrono;
+    const parsed = JSON.parse(raw) as PersistedChrono;
+    return { ...parsed, frozenElapsedMs: parsed.frozenElapsedMs ?? null };
   } catch {
     return null;
   }
@@ -55,13 +57,14 @@ function snapshotFromState(state: ChronometerState): PersistedChrono {
     paused: state.paused,
     pauseStartedAt: state.pauseStartedAt,
     hasSession: state.hasSession,
+    frozenElapsedMs: state.frozenElapsedMs,
   };
 }
 
 type ChronometerState = PersistedChrono & {
-  /** UI tick version — bumped on interval while active so React re-renders elapsed. */
   tickSeq: number;
   hydrated: boolean;
+  savePending: boolean;
   getElapsedMs: () => number;
   bumpUiTick: () => void;
   hydrateFromStorage: () => void;
@@ -69,6 +72,9 @@ type ChronometerState = PersistedChrono & {
   pause: () => void;
   resume: () => void;
   reset: () => void;
+  freezeForLog: () => number;
+  beginSave: () => boolean;
+  endSave: () => void;
   setActionName: (name: string) => void;
   setPillar: (pillar: Pillar | null) => void;
   setFeeling: (feeling: string) => void;
@@ -83,26 +89,32 @@ const emptyPersisted = (): PersistedChrono => ({
   paused: false,
   pauseStartedAt: null,
   hasSession: false,
+  frozenElapsedMs: null,
 });
 
 export const useChronometerStore = create<ChronometerState>((set, get) => ({
   ...emptyPersisted(),
   tickSeq: 0,
   hydrated: false,
-  getElapsedMs: () => computeChronoElapsedMs(get()),
+  savePending: false,
+  getElapsedMs: () => {
+    const s = get();
+    if (s.frozenElapsedMs != null) return s.frozenElapsedMs;
+    return computeChronoElapsedMs(s);
+  },
   bumpUiTick: () => set((s) => ({ tickSeq: s.tickSeq + 1 })),
   hydrateFromStorage: () => {
     if (get().hydrated) return;
     const loaded = loadChronoFromStorage();
     if (loaded) {
-      set({ ...loaded, hydrated: true });
+      set({ ...loaded, hydrated: true, savePending: false });
     } else {
       set({ hydrated: true });
     }
   },
   start: () => {
-    const { actionName, pillar, hasSession } = get();
-    if (hasSession) return false;
+    const { actionName, pillar, hasSession, savePending } = get();
+    if (savePending || hasSession) return false;
     if (!actionName.trim() || !pillar) return false;
     const next: PersistedChrono = {
       ...get(),
@@ -111,6 +123,7 @@ export const useChronometerStore = create<ChronometerState>((set, get) => ({
       paused: false,
       pauseStartedAt: null,
       hasSession: true,
+      frozenElapsedMs: null,
     };
     set({ ...next, tickSeq: get().tickSeq + 1 });
     persistChrono(next);
@@ -118,14 +131,14 @@ export const useChronometerStore = create<ChronometerState>((set, get) => ({
   },
   pause: () => {
     const s = get();
-    if (!s.hasSession || s.paused) return;
+    if (!s.hasSession || s.paused || s.savePending || s.frozenElapsedMs != null) return;
     const next: PersistedChrono = { ...s, paused: true, pauseStartedAt: Date.now() };
     set({ ...next, tickSeq: s.tickSeq + 1 });
     persistChrono(next);
   },
   resume: () => {
     const s = get();
-    if (!s.hasSession || !s.paused || s.pauseStartedAt == null) return;
+    if (!s.hasSession || !s.paused || s.pauseStartedAt == null || s.savePending || s.frozenElapsedMs != null) return;
     const delta = Date.now() - s.pauseStartedAt;
     const next: PersistedChrono = {
       ...s,
@@ -136,22 +149,45 @@ export const useChronometerStore = create<ChronometerState>((set, get) => ({
     set({ ...next, tickSeq: s.tickSeq + 1 });
     persistChrono(next);
   },
+  freezeForLog: () => {
+    const s = get();
+    const ms = s.frozenElapsedMs ?? computeChronoElapsedMs(s);
+    let next: PersistedChrono = { ...s, frozenElapsedMs: ms };
+    if (s.hasSession && !s.paused) {
+      const now = Date.now();
+      next = { ...next, paused: true, pauseStartedAt: now };
+    }
+    set({ ...next, tickSeq: s.tickSeq + 1 });
+    persistChrono(next);
+    return ms;
+  },
+  beginSave: () => {
+    if (get().savePending) return false;
+    set({ savePending: true });
+    return true;
+  },
+  endSave: () => {
+    set({ savePending: false });
+  },
   reset: () => {
     const cleared = { ...emptyPersisted(), feeling: get().feeling || 'happy' };
-    set({ ...cleared, tickSeq: 0, hydrated: true });
+    set({ ...cleared, tickSeq: 0, hydrated: true, savePending: false });
     persistChrono(cleared);
   },
   setActionName: (actionName) => {
+    if (get().savePending) return;
     const next = { ...snapshotFromState(get()), actionName };
     set({ actionName });
     if (!get().hasSession) persistChrono(next);
   },
   setPillar: (pillar) => {
+    if (get().savePending) return;
     const next = { ...snapshotFromState(get()), pillar };
     set({ pillar });
     if (!get().hasSession) persistChrono(next);
   },
   setFeeling: (feeling) => {
+    if (get().savePending) return;
     const next = { ...snapshotFromState(get()), feeling };
     set({ feeling });
     if (!get().hasSession) persistChrono(next);

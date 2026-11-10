@@ -10,7 +10,7 @@ import { useDeedsRefreshStore } from '@/stores';
 import { cn, dailyProgressBreakdown } from '@/lib/utils';
 import { mapDeedRows } from '@/lib/quest-mappers';
 import { format } from 'date-fns';
-import { Gauge, Pause, Play, Square, Timer, X, Plus, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, Gauge, Loader2, Pause, Play, Square, Timer, X, Plus, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MOBILE_SHELL, UI_CONSTANTS } from '@/constants';
 import { allFeelingOptions } from '@/lib/feelings';
 import { chronoDurationFields, formatChronoLoggedDuration } from '@/lib/chrono-duration';
+import {
+  buildActionNameSuggestions,
+  filterActionNameSuggestions,
+} from '@/lib/deed-name-suggestions';
+import { DeedActionNameChips } from './DeedActionNameChips';
 
 function formatChrono(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -28,19 +33,25 @@ function formatChrono(ms: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+type ToastState = { kind: 'success' | 'error'; message: string } | null;
+type SaveSource = 'finish' | 'manual' | null;
+
 export function FloatingQuestWidget() {
   const { profile, user, t } = useQuest();
   const lang = profile?.language ?? 'en';
   const [expanded, setExpanded] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
+  const [saveSource, setSaveSource] = useState<SaveSource>(null);
   const deedsGeneration = useDeedsRefreshStore((s) => s.generation);
   const [progressPercent, setProgressPercent] = useState(0);
+  const [nameSuggestions, setNameSuggestions] = useState(() => buildActionNameSuggestions([]));
 
   const hydrateFromStorage = useChronometerStore((s) => s.hydrateFromStorage);
   const tickSeq = useChronometerStore((s) => s.tickSeq);
   const hasSession = useChronometerStore((s) => s.hasSession);
   const paused = useChronometerStore((s) => s.paused);
+  const savePending = useChronometerStore((s) => s.savePending);
   const actionName = useChronometerStore((s) => s.actionName);
   const pillar = useChronometerStore((s) => s.pillar);
   const feeling = useChronometerStore((s) => s.feeling);
@@ -53,8 +64,14 @@ export function FloatingQuestWidget() {
   const setFeeling = useChronometerStore((s) => s.setFeeling);
   const getElapsedMs = useChronometerStore((s) => s.getElapsedMs);
   const bumpUiTick = useChronometerStore((s) => s.bumpUiTick);
+  const freezeForLog = useChronometerStore((s) => s.freezeForLog);
+  const beginSave = useChronometerStore((s) => s.beginSave);
+  const endSave = useChronometerStore((s) => s.endSave);
 
   const feelingOptions = useMemo(() => allFeelingOptions(profile), [profile]);
+
+  const uiLocked = savePending;
+  const fieldsLocked = sessionActiveFieldsLocked(hasSession, uiLocked);
 
   useEffect(() => {
     hydrateFromStorage();
@@ -71,7 +88,15 @@ export function FloatingQuestWidget() {
   }, [user, profile, deedsGeneration]);
 
   useEffect(() => {
-    if (!hasSession || paused) return;
+    if (!user || !expanded) return;
+    void questHttp.listDeeds({ limit: 150 }).then(({ data }) => {
+      if (!data?.length) return;
+      setNameSuggestions(buildActionNameSuggestions(mapDeedRows(data)));
+    });
+  }, [user, expanded, deedsGeneration]);
+
+  useEffect(() => {
+    if (!hasSession || paused || savePending) return;
     const id = setInterval(() => bumpUiTick(), 250);
     const onVis = () => bumpUiTick();
     document.addEventListener('visibilitychange', onVis);
@@ -79,7 +104,7 @@ export function FloatingQuestWidget() {
       clearInterval(id);
       document.removeEventListener('visibilitychange', onVis);
     };
-  }, [hasSession, paused, bumpUiTick]);
+  }, [hasSession, paused, savePending, bumpUiTick]);
 
   useEffect(() => {
     if (!toast) return;
@@ -90,23 +115,41 @@ export function FloatingQuestWidget() {
   const elapsedMs = useMemo(() => {
     void tickSeq;
     return getElapsedMs();
-  }, [tickSeq, getElapsedMs, paused, hasSession]);
+  }, [tickSeq, getElapsedMs, paused, hasSession, savePending]);
 
   const displayElapsed = useMemo(() => formatChrono(elapsedMs), [elapsedMs]);
   const sessionActive = hasSession;
-  const fieldsLocked = sessionActive;
 
-  const logDeedFromTimer = async (opts?: { keepExpanded?: boolean }) => {
+  const filteredChips = useMemo(
+    () =>
+      filterActionNameSuggestions(nameSuggestions, {
+        pillar: pillar ?? undefined,
+        query: actionName,
+        limit: 8,
+      }),
+    [nameSuggestions, pillar, actionName],
+  );
+
+  const logDeedFromTimer = async (source: SaveSource) => {
+    if (!beginSave()) return;
     setInlineError(null);
+    setSaveSource(source);
+    const frozenMs = freezeForLog();
+
     if (!user || !actionName.trim()) {
+      endSave();
+      setSaveSource(null);
       setInlineError(t('actionNameRequired'));
       return;
     }
     if (!pillar) {
+      endSave();
+      setSaveSource(null);
       setInlineError(t('pillarRequired'));
       return;
     }
-    const totalSec = Math.max(0, Math.round(elapsedMs / 1000));
+
+    const totalSec = Math.max(0, Math.round(frozenMs / 1000));
     const meta = createDeedMetadata();
     const p = pillar;
     const durationPart =
@@ -128,23 +171,27 @@ export function FloatingQuestWidget() {
 
     const { error } = await questHttp.createDeed(payload);
     if (error) {
-      setInlineError(t('saveDeedFailed'));
+      endSave();
+      setSaveSource(null);
+      setToast({ kind: 'error', message: t('saveDeedFailed') });
       return;
     }
 
     useDeedsRefreshStore.getState().bumpDeedsRefresh();
     const durPhrase =
-      p === 'heartset' || totalSec <= 0
-        ? null
-        : formatChronoLoggedDuration(totalSec, t);
-    setToast(durPhrase ? `${t('chronoToastLogged')} · ${durPhrase}` : t('chronoToastLogged'));
+      p === 'heartset' || totalSec <= 0 ? null : formatChronoLoggedDuration(totalSec, t);
+    setToast({
+      kind: 'success',
+      message: durPhrase ? `${t('chronoToastLogged')} · ${durPhrase}` : t('chronoToastLogged'),
+    });
+    endSave();
+    setSaveSource(null);
     reset();
-    if (!opts?.keepExpanded) setExpanded(false);
+    setExpanded(false);
   };
 
-  const finishAndLog = () => void logDeedFromTimer();
-
   const handleStart = () => {
+    if (uiLocked) return;
     setInlineError(null);
     if (!actionName.trim()) {
       setInlineError(t('actionNameRequired'));
@@ -156,6 +203,12 @@ export function FloatingQuestWidget() {
     }
     const ok = start();
     if (!ok) setInlineError(t('timerAlreadyRunning'));
+  };
+
+  const handlePickSuggestion = (s: { actionName: string; pillar: Pillar }) => {
+    if (uiLocked) return;
+    setActionName(s.actionName);
+    if (!hasSession) setPillar(s.pillar);
   };
 
   const goalMessage =
@@ -171,26 +224,35 @@ export function FloatingQuestWidget() {
         MOBILE_SHELL.widgetBottom,
         'md:left-auto md:right-4 md:bottom-6 md:w-[20rem] md:max-w-none md:items-end',
       )}
-      data-timer-version="2"
+      data-timer-version="3"
     >
       {toast && (
         <div
           role="status"
           className={cn(
-            'box-border flex w-full min-w-0 items-center gap-2 border border-emerald-500/30 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900 shadow-lg dark:bg-emerald-950/90 dark:text-emerald-100',
+            'box-border flex w-full min-w-0 items-center gap-2 px-4 py-3 text-sm font-bold shadow-lg',
             UI_CONSTANTS.cardRadius,
+            toast.kind === 'success'
+              ? 'border border-emerald-500/30 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/90 dark:text-emerald-100'
+              : 'border border-red-500/30 bg-red-50 text-red-900 dark:bg-red-950/90 dark:text-red-100',
           )}
         >
-          <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden />
-          <span className="leading-snug">{toast}</span>
+          {toast.kind === 'success' ? (
+            <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden />
+          ) : (
+            <AlertCircle className="h-5 w-5 shrink-0" aria-hidden />
+          )}
+          <span className="leading-snug">{toast.message}</span>
         </div>
       )}
 
       {expanded && (
         <div
+          aria-busy={savePending}
           className={cn(
-            'box-border w-full min-w-0 max-h-[min(70dvh,calc(100dvh-12rem))] overflow-x-hidden overflow-y-auto overscroll-y-contain border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900',
+            'relative box-border w-full min-w-0 max-h-[min(70dvh,calc(100dvh-12rem))] overflow-x-hidden overflow-y-auto overscroll-y-contain border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900',
             UI_CONSTANTS.cardRadius,
+            savePending && 'pointer-events-none',
           )}
         >
           <div className="mb-3 flex items-center justify-between gap-2">
@@ -201,14 +263,15 @@ export function FloatingQuestWidget() {
             <button
               type="button"
               onClick={() => setExpanded(false)}
-              className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              disabled={uiLocked}
+              className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-100 disabled:opacity-40 dark:hover:bg-zinc-800"
               aria-label={t('cancel')}
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          {(goalMessage || inlineError) && (
+          {(goalMessage || inlineError) && !savePending && (
             <p
               className={cn(
                 'mb-3 rounded-xl px-3 py-2 text-xs font-bold leading-snug',
@@ -244,6 +307,12 @@ export function FloatingQuestWidget() {
                 placeholder={t('whatAccomplished')}
                 disabled={fieldsLocked}
                 className={cn('h-12 min-h-11 text-base font-bold sm:text-sm', UI_CONSTANTS.buttonRadius)}
+              />
+              <DeedActionNameChips
+                suggestions={filteredChips}
+                selectedName={actionName}
+                onPick={handlePickSuggestion}
+                disabled={uiLocked || fieldsLocked}
               />
             </div>
             <div className="space-y-1.5">
@@ -287,6 +356,7 @@ export function FloatingQuestWidget() {
                 <Button
                   type="button"
                   onClick={handleStart}
+                  disabled={uiLocked}
                   className={cn(
                     'min-h-12 w-full touch-manipulation bg-indigo-600 font-bold uppercase text-[10px] tracking-widest',
                     UI_CONSTANTS.buttonRadius,
@@ -301,6 +371,7 @@ export function FloatingQuestWidget() {
                     <Button
                       type="button"
                       onClick={() => resume()}
+                      disabled={uiLocked}
                       className={cn(
                         'min-h-12 w-full touch-manipulation bg-indigo-600 font-bold uppercase text-[10px] tracking-widest',
                         UI_CONSTANTS.buttonRadius,
@@ -314,6 +385,7 @@ export function FloatingQuestWidget() {
                       type="button"
                       variant="outline"
                       onClick={() => pause()}
+                      disabled={uiLocked}
                       className={cn(
                         'min-h-12 w-full touch-manipulation font-bold uppercase text-[10px] tracking-widest',
                         UI_CONSTANTS.buttonRadius,
@@ -325,14 +397,19 @@ export function FloatingQuestWidget() {
                   )}
                   <Button
                     type="button"
-                    onClick={finishAndLog}
+                    onClick={() => void logDeedFromTimer('finish')}
+                    disabled={uiLocked}
                     className={cn(
                       'min-h-12 w-full touch-manipulation bg-zinc-900 font-bold uppercase text-[10px] tracking-widest dark:bg-white dark:text-zinc-900',
                       UI_CONSTANTS.buttonRadius,
                     )}
                   >
-                    <Square className="mr-2 h-4 w-4" />
-                    {t('finishAndLog')}
+                    {saveSource === 'finish' && savePending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Square className="mr-2 h-4 w-4" />
+                    )}
+                    {saveSource === 'finish' && savePending ? t('saving') : t('finishAndLog')}
                   </Button>
                 </div>
               )}
@@ -340,29 +417,42 @@ export function FloatingQuestWidget() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => void logDeedFromTimer({ keepExpanded: false })}
-                disabled={!sessionActive}
+                onClick={() => void logDeedFromTimer('manual')}
+                disabled={!sessionActive || uiLocked}
                 className={cn(
                   'min-h-12 w-full touch-manipulation font-bold uppercase text-[10px] tracking-widest',
                   UI_CONSTANTS.buttonRadius,
                 )}
               >
-                <Plus className="mr-2 h-4 w-4" />
-                {t('logWithDuration')}
+                {saveSource === 'manual' && savePending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="mr-2 h-4 w-4" />
+                )}
+                {saveSource === 'manual' && savePending ? t('saving') : t('logWithDuration')}
               </Button>
             </div>
           </div>
+
+          {savePending && (
+            <div
+              className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] bg-white/40 dark:bg-zinc-900/50"
+              aria-hidden
+            />
+          )}
         </div>
       )}
 
       <button
         type="button"
         onClick={() => {
+          if (savePending) return;
           setExpanded((e) => !e);
           setInlineError(null);
         }}
+        disabled={savePending}
         className={cn(
-          'flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation flex-col items-center justify-center rounded-full border border-indigo-500/30 bg-white shadow-xl shadow-indigo-500/20 transition active:scale-95 dark:bg-zinc-900',
+          'flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation flex-col items-center justify-center rounded-full border border-indigo-500/30 bg-white shadow-xl shadow-indigo-500/20 transition active:scale-95 disabled:opacity-60 dark:bg-zinc-900',
           sessionActive && !paused && 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950',
           paused && 'ring-2 ring-amber-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950',
         )}
@@ -374,4 +464,8 @@ export function FloatingQuestWidget() {
       </button>
     </div>
   );
+}
+
+function sessionActiveFieldsLocked(hasSession: boolean, saving: boolean): boolean {
+  return hasSession || saving;
 }

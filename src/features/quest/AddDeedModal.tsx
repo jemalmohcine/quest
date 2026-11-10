@@ -216,7 +216,14 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 p-6 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom,0px)))]">
+        <form
+          onSubmit={handleSubmit}
+          aria-busy={isSubmitting}
+          className={cn(
+            'space-y-5 p-6 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom,0px)))]',
+            isSubmitting && 'pointer-events-none opacity-[0.92]',
+          )}
+        >
           <div className="space-y-3">
             <div className="space-y-2">
               <Label htmlFor="action" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
@@ -373,7 +380,14 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
                 UI_CONSTANTS.buttonRadius,
               )}
             >
-              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : t('saveDeed')}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  {t('saving')}
+                </>
+              ) : (
+                t('saveDeed')
+              )}
             </Button>
           </DialogFooter>
         </form>
