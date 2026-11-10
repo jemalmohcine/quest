@@ -106,4 +106,35 @@ export const questApi = {
   ) {
     return supabase.from('weekly_resumes').upsert(payload, { onConflict: 'user_id,week_id' });
   },
+
+  async getResume(
+    supabase: SB,
+    userId: string,
+    periodType: string,
+    periodStart: string,
+    scope: string,
+  ) {
+    return supabase
+      .from('resumes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('period_type', periodType)
+      .eq('period_start', periodStart)
+      .eq('scope', scope)
+      .maybeSingle();
+  },
+
+  async insertResume(
+    supabase: SB,
+    payload: {
+      user_id: string;
+      period_type: string;
+      period_start: string;
+      scope: string;
+      narrative: string;
+      audio_base64?: string | null;
+    },
+  ) {
+    return supabase.from('resumes').insert(payload).select().single();
+  },
 };
