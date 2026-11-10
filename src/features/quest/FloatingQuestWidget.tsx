@@ -10,16 +10,20 @@ import { useDeedsRefreshStore } from '@/stores';
 import { cn, dailyProgressBreakdown } from '@/lib/utils';
 import { mapDeedRows } from '@/lib/quest-mappers';
 import { format } from 'date-fns';
-import { Gauge, Play, Square, Timer, X, Plus } from 'lucide-react';
+import { Gauge, Pause, Play, Square, Timer, X, Plus, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MOBILE_SHELL, UI_CONSTANTS } from '@/constants';
+import { allFeelingOptions } from '@/lib/feelings';
+import { chronoDurationFields, formatChronoLoggedDuration } from '@/lib/chrono-duration';
 
 function formatChrono(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
@@ -27,19 +31,33 @@ export function FloatingQuestWidget() {
   const { profile, user, t } = useQuest();
   const lang = profile?.language ?? 'en';
   const [expanded, setExpanded] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const deedsGeneration = useDeedsRefreshStore((s) => s.generation);
   const [progressPercent, setProgressPercent] = useState(0);
-  const running = useChronometerStore((s) => s.running);
-  const elapsedMs = useChronometerStore((s) => s.elapsedMs);
+
+  const hydrateFromStorage = useChronometerStore((s) => s.hydrateFromStorage);
+  const tickSeq = useChronometerStore((s) => s.tickSeq);
+  const hasSession = useChronometerStore((s) => s.hasSession);
+  const paused = useChronometerStore((s) => s.paused);
   const actionName = useChronometerStore((s) => s.actionName);
   const pillar = useChronometerStore((s) => s.pillar);
+  const feeling = useChronometerStore((s) => s.feeling);
   const start = useChronometerStore((s) => s.start);
-  const stop = useChronometerStore((s) => s.stop);
-  const tick = useChronometerStore((s) => s.tick);
+  const pause = useChronometerStore((s) => s.pause);
+  const resume = useChronometerStore((s) => s.resume);
+  const reset = useChronometerStore((s) => s.reset);
   const setActionName = useChronometerStore((s) => s.setActionName);
   const setPillar = useChronometerStore((s) => s.setPillar);
-  const reset = useChronometerStore((s) => s.reset);
+  const setFeeling = useChronometerStore((s) => s.setFeeling);
+  const getElapsedMs = useChronometerStore((s) => s.getElapsedMs);
+  const bumpUiTick = useChronometerStore((s) => s.bumpUiTick);
+
+  const feelingOptions = useMemo(() => allFeelingOptions(profile), [profile]);
+
+  useEffect(() => {
+    hydrateFromStorage();
+  }, [hydrateFromStorage]);
 
   useEffect(() => {
     if (!user) return;
@@ -52,42 +70,91 @@ export function FloatingQuestWidget() {
   }, [user, profile, deedsGeneration]);
 
   useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => tick(), 250);
-    return () => clearInterval(id);
-  }, [running, tick]);
+    if (!hasSession || paused) return;
+    const id = setInterval(() => bumpUiTick(), 250);
+    const onVis = () => bumpUiTick();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [hasSession, paused, bumpUiTick]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const elapsedMs = useMemo(() => {
+    void tickSeq;
+    return getElapsedMs();
+  }, [tickSeq, getElapsedMs, paused, hasSession]);
 
   const displayElapsed = useMemo(() => formatChrono(elapsedMs), [elapsedMs]);
+  const sessionActive = hasSession;
+  const fieldsLocked = sessionActive;
 
-  const finishToDeed = async () => {
+  const logDeedFromTimer = async (opts?: { keepExpanded?: boolean }) => {
+    setInlineError(null);
     if (!user || !actionName.trim()) {
-      setMessage(t('actionNameRequired'));
+      setInlineError(t('actionNameRequired'));
       return;
     }
-    if (running) stop();
-    const totalSec = Math.max(1, Math.round(elapsedMs / 1000));
+    if (!pillar) {
+      setInlineError(t('pillarRequired'));
+      return;
+    }
+    const totalSec = Math.max(0, Math.round(elapsedMs / 1000));
     const meta = createDeedMetadata();
-    const p = pillar ?? 'skillset';
-    const durationUnit = totalSec < 60 ? ('seconds' as const) : ('minutes' as const);
+    const p = pillar;
+    const durationPart =
+      p !== 'heartset' && totalSec > 0
+        ? (() => {
+            const { durationSeconds, durationUnit } = chronoDurationFields(totalSec);
+            return { durationSeconds, durationUnit };
+          })()
+        : {};
+
     const payload = {
       pillar: p,
       actionName: actionName.trim(),
-      feeling: 'focused',
+      feeling: (feeling || 'happy').toLowerCase(),
       dateStr: meta.date,
       timeStr: meta.time,
-      ...(p !== 'heartset' && totalSec > 0
-        ? { durationSeconds: totalSec, durationUnit }
-        : {}),
+      ...durationPart,
     };
+
     const { error } = await questHttp.createDeed(payload);
     if (error) {
-      setMessage(t('saveDeedFailed'));
+      setInlineError(t('saveDeedFailed'));
       return;
     }
+
     useDeedsRefreshStore.getState().bumpDeedsRefresh();
-    setMessage(t('chronoDeedSaved'));
+    const durPhrase =
+      p === 'heartset' || totalSec <= 0
+        ? null
+        : formatChronoLoggedDuration(totalSec, t);
+    setToast(durPhrase ? `${t('chronoToastLogged')} · ${durPhrase}` : t('chronoToastLogged'));
     reset();
-    setExpanded(false);
+    if (!opts?.keepExpanded) setExpanded(false);
+  };
+
+  const finishAndLog = () => void logDeedFromTimer();
+
+  const handleStart = () => {
+    setInlineError(null);
+    if (!actionName.trim()) {
+      setInlineError(t('actionNameRequired'));
+      return;
+    }
+    if (!pillar) {
+      setInlineError(t('pillarRequired'));
+      return;
+    }
+    const ok = start();
+    if (!ok) setInlineError(t('timerAlreadyRunning'));
   };
 
   const goalMessage =
@@ -101,6 +168,19 @@ export function FloatingQuestWidget() {
         'md:left-auto md:right-4 md:bottom-6 md:max-w-none md:items-end',
       )}
     >
+      {toast && (
+        <div
+          role="status"
+          className={cn(
+            'flex w-[min(20rem,calc(100vw-5.5rem))] items-center gap-2 border border-emerald-500/30 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900 shadow-lg dark:bg-emerald-950/90 dark:text-emerald-100',
+            UI_CONSTANTS.cardRadius,
+          )}
+        >
+          <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden />
+          <span className="leading-snug">{toast}</span>
+        </div>
+      )}
+
       {expanded && (
         <div
           className={cn(
@@ -123,14 +203,31 @@ export function FloatingQuestWidget() {
             </button>
           </div>
 
-          {(goalMessage || message) && (
-            <p className="mb-3 rounded-xl bg-indigo-500/10 px-3 py-2 text-xs font-bold leading-snug text-indigo-700 dark:text-indigo-300">
-              {message ?? goalMessage}
+          {(goalMessage || inlineError) && (
+            <p
+              className={cn(
+                'mb-3 rounded-xl px-3 py-2 text-xs font-bold leading-snug',
+                inlineError
+                  ? 'bg-red-500/10 text-red-700 dark:text-red-300'
+                  : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
+              )}
+            >
+              {inlineError ?? goalMessage}
             </p>
           )}
 
-          <p className="mb-4 text-center font-mono text-3xl font-black tabular-nums text-zinc-900 dark:text-white">
+          <p
+            className={cn(
+              'mb-4 text-center font-mono text-3xl font-black tabular-nums text-zinc-900 dark:text-white',
+              paused && 'text-amber-600 dark:text-amber-400',
+            )}
+          >
             {displayElapsed}
+            {paused && (
+              <span className="mt-1 block text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                {t('timerPaused')}
+              </span>
+            )}
           </p>
 
           <div className="space-y-3">
@@ -138,11 +235,16 @@ export function FloatingQuestWidget() {
               value={actionName}
               onChange={(e) => setActionName(e.target.value)}
               placeholder={t('whatAccomplished')}
+              disabled={fieldsLocked}
               className={cn('h-12 min-h-11 text-base font-bold sm:text-sm', UI_CONSTANTS.buttonRadius)}
             />
-            <Select value={pillar ?? 'skillset'} onValueChange={(v) => v && setPillar(v as Pillar)}>
+            <Select
+              value={pillar ?? 'soulset'}
+              onValueChange={(v) => v && setPillar(v as Pillar)}
+              disabled={fieldsLocked}
+            >
               <SelectTrigger className={cn('h-12 min-h-11 font-bold', UI_CONSTANTS.buttonRadius)}>
-                <SelectValue />
+                <SelectValue placeholder={t('pillar')} />
               </SelectTrigger>
               <SelectContent>
                 {PILLARS.map((p) => (
@@ -153,13 +255,26 @@ export function FloatingQuestWidget() {
               </SelectContent>
             </Select>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              {!running ? (
+            <Select value={feeling} onValueChange={(v) => v && setFeeling(v)} disabled={fieldsLocked}>
+              <SelectTrigger className={cn('h-12 min-h-11 font-bold capitalize', UI_CONSTANTS.buttonRadius)}>
+                <SelectValue placeholder={t('feeling')} />
+              </SelectTrigger>
+              <SelectContent className="max-h-48">
+                {feelingOptions.map((f) => (
+                  <SelectItem key={f} value={f} className="min-h-11 capitalize">
+                    {f}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex flex-col gap-2">
+              {!sessionActive ? (
                 <Button
                   type="button"
-                  onClick={() => start(actionName, pillar)}
+                  onClick={handleStart}
                   className={cn(
-                    'min-h-12 w-full flex-1 touch-manipulation bg-indigo-600 font-bold uppercase text-[10px] tracking-widest sm:w-auto',
+                    'min-h-12 w-full touch-manipulation bg-indigo-600 font-bold uppercase text-[10px] tracking-widest',
                     UI_CONSTANTS.buttonRadius,
                   )}
                 >
@@ -167,24 +282,54 @@ export function FloatingQuestWidget() {
                   {t('startTimer')}
                 </Button>
               ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => stop()}
-                  className={cn(
-                    'min-h-12 w-full flex-1 touch-manipulation font-bold uppercase text-[10px] tracking-widest sm:w-auto',
-                    UI_CONSTANTS.buttonRadius,
+                <div className="grid grid-cols-2 gap-2">
+                  {paused ? (
+                    <Button
+                      type="button"
+                      onClick={() => resume()}
+                      className={cn(
+                        'min-h-12 w-full touch-manipulation bg-indigo-600 font-bold uppercase text-[10px] tracking-widest',
+                        UI_CONSTANTS.buttonRadius,
+                      )}
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      {t('resumeTimer')}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => pause()}
+                      className={cn(
+                        'min-h-12 w-full touch-manipulation font-bold uppercase text-[10px] tracking-widest',
+                        UI_CONSTANTS.buttonRadius,
+                      )}
+                    >
+                      <Pause className="mr-2 h-4 w-4" />
+                      {t('pauseTimer')}
+                    </Button>
                   )}
-                >
-                  <Square className="mr-2 h-4 w-4" />
-                  {t('stopTimer')}
-                </Button>
+                  <Button
+                    type="button"
+                    onClick={finishAndLog}
+                    className={cn(
+                      'min-h-12 w-full touch-manipulation bg-zinc-900 font-bold uppercase text-[10px] tracking-widest dark:bg-white dark:text-zinc-900',
+                      UI_CONSTANTS.buttonRadius,
+                    )}
+                  >
+                    <Square className="mr-2 h-4 w-4" />
+                    {t('finishAndLog')}
+                  </Button>
+                </div>
               )}
+
               <Button
                 type="button"
-                onClick={() => void finishToDeed()}
+                variant="secondary"
+                onClick={() => void logDeedFromTimer({ keepExpanded: false })}
+                disabled={!sessionActive}
                 className={cn(
-                  'min-h-12 w-full flex-1 touch-manipulation bg-zinc-900 font-bold uppercase text-[10px] tracking-widest dark:bg-white dark:text-zinc-900 sm:w-auto',
+                  'min-h-12 w-full touch-manipulation font-bold uppercase text-[10px] tracking-widest',
                   UI_CONSTANTS.buttonRadius,
                 )}
               >
@@ -200,11 +345,12 @@ export function FloatingQuestWidget() {
         type="button"
         onClick={() => {
           setExpanded((e) => !e);
-          setMessage(null);
+          setInlineError(null);
         }}
         className={cn(
           'flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation flex-col items-center justify-center rounded-full border border-indigo-500/30 bg-white shadow-xl shadow-indigo-500/20 transition active:scale-95 dark:bg-zinc-900',
-          running && 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950',
+          sessionActive && !paused && 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950',
+          paused && 'ring-2 ring-amber-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950',
         )}
         aria-expanded={expanded}
         aria-label={t('progressWidget')}
