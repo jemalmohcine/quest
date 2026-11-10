@@ -2,7 +2,7 @@ import { useQuest } from './QuestProvider';
 import { questHttp } from '@/services/quest-http';
 import { useDeedsRefreshStore } from '@/stores';
 import { mapDeedRows } from '@/lib/quest-mappers';
-import { UserProfile, PILLARS, Pillar, PILLAR_LABELS, FEELINGS } from '@/types';
+import { UserProfile, PILLARS, Pillar, PILLAR_LABELS, FEELINGS, type DurationObjective } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { User, Globe, Target, Bell, Download, Trash2, LogOut, Info, Camera, Loader2, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { format, startOfMonth, startOfWeek } from 'date-fns';
+import { DurationValueField } from './DurationValueField';
+import type { DurationUnit } from '@/lib/duration-units';
 import { cn, sumPillarObjectives } from '@/lib/utils';
 import { normalizeFeelingKey } from '@/lib/feelings';
 import { applyDomTheme, persistTheme } from '@/lib/theme-preference';
@@ -38,6 +40,13 @@ export function More() {
     heartset: '1',
   });
   const [customFeelingInput, setCustomFeelingInput] = useState('');
+  const [durationDraft, setDurationDraft] = useState<Record<Pillar, { value: string; unit: DurationUnit }>>({
+    soulset: { value: '', unit: 'minutes' },
+    healthset: { value: '', unit: 'minutes' },
+    mindset: { value: '', unit: 'minutes' },
+    skillset: { value: '', unit: 'minutes' },
+    heartset: { value: '', unit: 'minutes' },
+  });
 
   const lang = profile?.language || 'en';
 
@@ -65,6 +74,21 @@ export function More() {
       heartset: String(base),
     });
   }, [profile?.objectivePerPillar, profile?.dailyObjective]);
+
+  useEffect(() => {
+    if (!profile) return;
+    const next = { ...durationDraft };
+    for (const p of PILLARS) {
+      if (p === 'heartset') {
+        next[p] = { value: '', unit: 'minutes' };
+        continue;
+      }
+      const obj = profile.durationObjectivePerPillar?.[p];
+      next[p] = obj ? { value: String(obj.value), unit: obj.unit } : { value: '', unit: 'minutes' };
+    }
+    setDurationDraft(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when profile objectives change
+  }, [profile?.durationObjectivePerPillar]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -117,7 +141,22 @@ export function More() {
       next[p] = Number.isNaN(v) ? 0 : Math.max(0, Math.min(99, v));
     });
     const total = sumPillarObjectives(next);
-    await patchProfile({ objectivePerPillar: next, dailyObjective: total });
+
+    const durationObjectivePerPillar: Partial<Record<Pillar, DurationObjective>> = {};
+    for (const p of PILLARS) {
+      if (p === 'heartset') continue;
+      const d = durationDraft[p];
+      const val = parseFloat(d.value);
+      if (!Number.isNaN(val) && val > 0) {
+        durationObjectivePerPillar[p] = { value: Math.min(9999, val), unit: d.unit };
+      }
+    }
+
+    await patchProfile({
+      objectivePerPillar: next,
+      dailyObjective: total,
+      durationObjectivePerPillar,
+    });
   };
 
   const addCustomFeeling = async () => {
@@ -152,7 +191,7 @@ export function More() {
       let deeds = mapDeedRows(raw);
 
       if (exportFilter === 'week') {
-        const start = format(startOfWeek(new Date()), 'yyyy-MM-dd');
+        const start = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
         deeds = deeds.filter((d) => d.date >= start);
       } else if (exportFilter === 'month') {
         const start = format(startOfMonth(new Date()), 'yyyy-MM-dd');
@@ -440,20 +479,40 @@ export function More() {
 
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   {PILLARS.map((p) => (
-                    <div key={p} className="min-w-0 space-y-2">
+                    <div key={p} className="min-w-0 space-y-3 rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
                       <label className="block truncate text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
                         {PILLAR_LABELS[lang][p]}
                       </label>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        max={99}
-                        value={pillarDraft[p]}
-                        onChange={(e) => setPillarDraft((d) => ({ ...d, [p]: e.target.value }))}
-                        className={cn('h-12 border-none bg-zinc-100 text-sm font-black text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100', UI_CONSTANTS.inputRadius)}
-                        disabled={isUpdating}
-                      />
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{t('deedsObjective')}</span>
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={99}
+                          value={pillarDraft[p]}
+                          onChange={(e) => setPillarDraft((d) => ({ ...d, [p]: e.target.value }))}
+                          className={cn(
+                            'h-12 border-none bg-zinc-100 text-sm font-black text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100',
+                            UI_CONSTANTS.inputRadius,
+                          )}
+                          disabled={isUpdating}
+                        />
+                      </div>
+                      {p !== 'heartset' ? (
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{t('durationObjectives')}</span>
+                          <DurationValueField
+                            value={durationDraft[p].value}
+                            unit={durationDraft[p].unit}
+                            onValueChange={(v) => setDurationDraft((d) => ({ ...d, [p]: { ...d[p], value: v } }))}
+                            onUnitChange={(u) => setDurationDraft((d) => ({ ...d, [p]: { ...d[p], unit: u } }))}
+                            disabled={isUpdating}
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-[10px] font-medium text-zinc-500">{t('heartsetNoDuration')}</p>
+                      )}
                     </div>
                   ))}
                 </div>

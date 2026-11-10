@@ -22,7 +22,8 @@ export function Resumes() {
   const { user, profile, t } = useQuest();
   const deedsGeneration = useDeedsRefreshStore((s) => s.generation);
   const [deeds, setDeeds] = useState<Deed[]>([]);
-  const [selectedWeek, setSelectedWeek] = useState<string>(format(startOfWeek(new Date()), 'yyyy-MM-dd'));
+  const WEEK_OPTS = { weekStartsOn: 1 as const };
+  const [selectedWeek, setSelectedWeek] = useState<string>(format(startOfWeek(new Date(), WEEK_OPTS), 'yyyy-MM-dd'));
   const [narrative, setNarrative] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
@@ -37,7 +38,7 @@ export function Resumes() {
   const [hasGeneratedThisWeek, setHasGeneratedThisWeek] = useState(false);
 
   const getWeekId = (date: Date) => {
-    return `${getYear(date)}-W${getWeek(date)}`;
+    return `${getYear(date)}-W${getWeek(date, WEEK_OPTS)}`;
   };
 
   const lastAudioDataRef = useRef<string | null>(null);
@@ -95,8 +96,8 @@ export function Resumes() {
   };
 
   const weekOptions = Array.from({ length: 4 }, (_, i) => {
-    const start = startOfWeek(subWeeks(new Date(), i));
-    const end = endOfWeek(subWeeks(new Date(), i));
+    const start = startOfWeek(subWeeks(new Date(), i), WEEK_OPTS);
+    const end = endOfWeek(subWeeks(new Date(), i), WEEK_OPTS);
     return {
       value: format(start, 'yyyy-MM-dd'),
       label: `Week of ${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`,

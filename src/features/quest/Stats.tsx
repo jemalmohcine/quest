@@ -1,14 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuest } from './QuestProvider';
 import { questHttp } from '@/services/quest-http';
 import { mapDeedRows } from '@/lib/quest-mappers';
 import { Deed, PILLAR_COLORS, PILLAR_LABELS, Pillar, PILLARS } from '@/types';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { DeleteDeedDialog } from './DeleteDeedDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip, LabelList, Legend } from 'recharts';
-import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, eachDayOfInterval, subDays, eachMonthOfInterval, isSameMonth } from 'date-fns';
-import { Filter } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  Cell,
+  Tooltip,
+  LabelList,
+  Legend,
+  ComposedChart,
+  Line,
+  ReferenceDot,
+} from 'recharts';
+import { format, eachDayOfInterval, eachMonthOfInterval, isSameMonth, parseISO } from 'date-fns';
+import { Filter, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DeedCard } from './DeedCard';
 import { UI_CONSTANTS } from '@/constants';
@@ -16,8 +31,19 @@ import { SectionHeader } from './SectionHeader';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EditDeedDialog } from './EditDeedDialog';
 import { useDeedsRefreshStore } from '@/stores';
+import type { TranslationKey } from '@/lib/translations';
+import { rangeForPeriod, type StatsPeriod, lastNDaysRange } from '@/lib/stats-range';
+import {
+  deedsOnDay,
+  eachDayInRange,
+  isDailyObjectivesMet,
+  isPillarDeedsMetForPeriod,
+  isPillarDurationMetForPeriod,
+  periodDeedTarget,
+  periodDurationTargetMinutes,
+} from '@/lib/objectives';
 
-type TimePeriod = 'day' | 'week' | 'month' | 'year';
+const WEEK_OPTS = { weekStartsOn: 1 as const };
 
 function localHourFromDeed(d: Deed): number | null {
   const raw = d.time?.trim() ?? '';
@@ -32,22 +58,38 @@ function localHourFromDeed(d: Deed): number | null {
   return null;
 }
 
+function emptyPillarCounts(): Record<Pillar, number> {
+  return PILLARS.reduce((acc, p) => ({ ...acc, [p]: 0 }), {} as Record<Pillar, number>);
+}
+
+function stackTotal(row: Record<string, string | number | boolean>): number {
+  return PILLARS.reduce((s, p) => s + Number(row[p] ?? 0), 0);
+}
+
 function TimeSeriesTooltip({
   active,
   payload,
   label,
   lang,
+  t,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{ payload?: Record<string, unknown> }>;
   label?: string;
   lang: 'en' | 'fr';
+  t: (k: TranslationKey) => string;
 }) {
   if (!active || !payload?.[0]?.payload) return null;
-  const row = payload[0].payload as Record<string, string | number>;
+  const row = payload[0].payload as Record<string, string | number | boolean>;
   return (
     <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-bold shadow-lg dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
       <p className="mb-2 text-sm text-zinc-900 dark:text-white">{label}</p>
+      {row.objectiveMet ? (
+        <p className="mb-2 flex items-center gap-1 text-amber-600 dark:text-amber-400">
+          <Star className="h-3 w-3 fill-current" />
+          {t('objectiveStar')}
+        </p>
+      ) : null}
       <ul className="space-y-1">
         {PILLARS.map((p) => (
           <li key={p} className="flex justify-between gap-6">
@@ -64,41 +106,36 @@ export function Stats() {
   const { user, profile, t } = useQuest();
   const deedsGeneration = useDeedsRefreshStore((s) => s.generation);
   const [deeds, setDeeds] = useState<Deed[]>([]);
-  const [period, setPeriod] = useState<TimePeriod>('week');
+  const [period, setPeriod] = useState<StatsPeriod>('week');
+  const [customFrom, setCustomFrom] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [customTo, setCustomTo] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [appliedCustom, setAppliedCustom] = useState<{ from: string; to: string } | null>(null);
+
+  useEffect(() => {
+    if (period === 'custom' && !appliedCustom) {
+      setAppliedCustom({ from: customFrom, to: customTo });
+    }
+  }, [period, appliedCustom, customFrom, customTo]);
   const [filterPillar, setFilterPillar] = useState<Pillar | 'all'>('all');
   const [deedToDelete, setDeedToDelete] = useState<Deed | null>(null);
   const [deedToEdit, setDeedToEdit] = useState<Deed | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const emptyPillarCounts = (): Record<Pillar, number> =>
-    PILLARS.reduce((acc, p) => ({ ...acc, [p]: 0 }), {} as Record<Pillar, number>);
+  const now = new Date();
+  const statsRange = useMemo(
+    () =>
+      period === 'custom' && appliedCustom
+        ? rangeForPeriod('custom', now, appliedCustom)
+        : rangeForPeriod(period === 'custom' ? 'week' : period, now),
+    [period, appliedCustom, now],
+  );
 
   useEffect(() => {
     if (!user) return;
-
-    let startDate: Date;
-    const now = new Date();
     setIsLoading(true);
 
-    switch (period) {
-      case 'day':
-        startDate = startOfDay(now);
-        break;
-      case 'week':
-        startDate = startOfWeek(now);
-        break;
-      case 'month':
-        startDate = startOfMonth(now);
-        break;
-      case 'year':
-        startDate = startOfYear(now);
-        break;
-    }
-
-    const startYmd = format(startDate, 'yyyy-MM-dd');
-
     const load = async () => {
-      const { data, error } = await questHttp.listDeeds({ since: startYmd });
+      const { data, error } = await questHttp.listDeeds({ from: statsRange.startYmd, to: statsRange.endYmd });
       if (error) {
         console.error('Error fetching stats:', error);
         setIsLoading(false);
@@ -109,7 +146,7 @@ export function Stats() {
     };
 
     void load();
-  }, [user, period, deedsGeneration]);
+  }, [user, statsRange.startYmd, statsRange.endYmd, deedsGeneration]);
 
   const handleDelete = async () => {
     if (!deedToDelete?.id) return;
@@ -124,20 +161,34 @@ export function Stats() {
   };
 
   const lang = profile?.language ?? 'en';
+  const dayCount = statsRange.dayCount;
 
-  const deedsByPillarData = PILLARS.map((pillar) => ({
-    name: PILLAR_LABELS[lang][pillar],
-    count: deeds.filter((d) => d.pillar === pillar).length,
-    pillar: pillar,
-    objective: profile?.objectivePerPillar[pillar] || 1,
-  }));
+  const deedsByPillarData = PILLARS.map((pillar) => {
+    const count = deeds.filter((d) => d.pillar === pillar).length;
+    const target = periodDeedTarget(profile, pillar, dayCount);
+    return {
+      name: PILLAR_LABELS[lang][pillar],
+      count,
+      pillar,
+      target,
+      objectiveMet: isPillarDeedsMetForPeriod(profile, pillar, count, dayCount),
+      labelText: target > 0 ? `${count} / ${target}` : String(count),
+    };
+  });
 
-  const durationByPillarData = PILLARS.map((pillar) => ({
-    name: PILLAR_LABELS[lang][pillar],
-    duration: deeds.filter((d) => d.pillar === pillar).reduce((acc, d) => acc + (d.duration || 0), 0),
-    pillar: pillar,
-    unit: 'min',
-  }));
+  const durationPillars = PILLARS.filter((p) => p !== 'heartset');
+  const durationByPillarData = durationPillars.map((pillar) => {
+    const duration = deeds.filter((d) => d.pillar === pillar).reduce((acc, d) => acc + (d.duration || 0), 0);
+    const target = periodDurationTargetMinutes(profile, pillar, dayCount);
+    return {
+      name: PILLAR_LABELS[lang][pillar],
+      duration,
+      pillar,
+      target,
+      objectiveMet: isPillarDurationMetForPeriod(profile, pillar, duration, dayCount),
+      labelText: target > 0 ? `${duration} / ${target}m` : `${duration}m`,
+    };
+  });
 
   const feelingsDist = deeds.reduce(
     (acc, deed) => {
@@ -153,28 +204,30 @@ export function Stats() {
 
   const filteredDeeds = filterPillar === 'all' ? deeds : deeds.filter((d) => d.pillar === filterPillar);
 
-  const getTimeSeriesData = (): Record<string, string | number>[] => {
-    const now = new Date();
+  const timeSeriesData = useMemo((): Record<string, string | number | boolean>[] => {
     if (period === 'day') {
-      const todayStr = format(startOfDay(now), 'yyyy-MM-dd');
+      const todayStr = statsRange.startYmd;
       return Array.from({ length: 24 }, (_, hour) => {
-        const row: Record<string, string | number> = { name: `${hour}h`, ...emptyPillarCounts() };
+        const row: Record<string, string | number | boolean> = { name: `${hour}h`, ...emptyPillarCounts() };
         deeds.forEach((d) => {
           if (d.date !== todayStr) return;
           const h = localHourFromDeed(d);
           if (h !== hour) return;
           row[d.pillar] = (row[d.pillar] as number) + 1;
         });
+        const dayDeeds = deedsOnDay(deeds, todayStr);
+        row.objectiveMet = isDailyObjectivesMet(profile, dayDeeds);
+        row.total = stackTotal(row);
         return row;
       });
     }
 
-    if (period === 'week') {
-      const days = eachDayOfInterval({ start: subDays(now, 6), end: now });
+    if (period === 'week' || (period === 'custom' && dayCount <= 14)) {
+      const days = eachDayInRange(statsRange);
       return days.map((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
-        const row: Record<string, string | number> = {
-          name: format(day, 'EEE'),
+        const row: Record<string, string | number | boolean> = {
+          name: format(day, 'EEE', WEEK_OPTS),
           date: dateStr,
           ...emptyPillarCounts(),
         };
@@ -183,15 +236,18 @@ export function Stats() {
           .forEach((d) => {
             row[d.pillar] = (row[d.pillar] as number) + 1;
           });
+        row.objectiveMet = isDailyObjectivesMet(profile, deedsOnDay(deeds, dateStr));
+        row.total = stackTotal(row);
         return row;
       });
     }
 
-    if (period === 'month') {
-      const days = eachDayOfInterval({ start: subDays(now, 29), end: now });
+    if (period === 'month' || (period === 'custom' && dayCount > 14 && dayCount <= 62)) {
+      const roll = lastNDaysRange(Math.min(30, dayCount), statsRange.end);
+      const days = eachDayOfInterval({ start: roll.start, end: roll.end });
       return days.map((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
-        const row: Record<string, string | number> = {
+        const row: Record<string, string | number | boolean> = {
           name: format(day, 'd MMM'),
           date: dateStr,
           ...emptyPillarCounts(),
@@ -201,52 +257,119 @@ export function Stats() {
           .forEach((d) => {
             row[d.pillar] = (row[d.pillar] as number) + 1;
           });
+        row.objectiveMet = isDailyObjectivesMet(profile, deedsOnDay(deeds, dateStr));
+        row.total = stackTotal(row);
         return row;
       });
     }
 
-    if (period === 'year') {
-      const months = eachMonthOfInterval({ start: startOfYear(now), end: now });
+    if (period === 'year' || period === 'custom') {
+      const months = eachMonthOfInterval({ start: statsRange.start, end: statsRange.end });
       return months.map((month) => {
-        const row: Record<string, string | number> = { name: format(month, 'MMM'), ...emptyPillarCounts() };
+        const row: Record<string, string | number | boolean> = { name: format(month, 'MMM'), ...emptyPillarCounts() };
         deeds.forEach((d) => {
-          const deedDate = new Date(d.date);
+          const deedDate = parseISO(d.date);
           if (isSameMonth(deedDate, month)) row[d.pillar] = (row[d.pillar] as number) + 1;
         });
+        row.objectiveMet = false;
+        row.total = stackTotal(row);
         return row;
       });
     }
 
     return [];
-  };
+  }, [period, deeds, profile, statsRange, dayCount]);
 
-  const timeSeriesData = getTimeSeriesData();
+  const objectiveDots = timeSeriesData.filter((row) => row.objectiveMet && Number(row.total) > 0);
 
   return (
     <div className="py-4 md:py-8 space-y-8">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-black tracking-tighter mb-1">{t('stats')}</h1>
-          <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">{t('analyzeJourney')}</p>
+      <header className="flex flex-col gap-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-black tracking-tighter mb-1">{t('stats')}</h1>
+            <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">{t('analyzeJourney')}</p>
+            <p className="mt-1 text-[10px] font-bold text-zinc-400 tabular-nums">
+              {statsRange.startYmd} → {statsRange.endYmd}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 self-start">
+            {(['day', 'week', 'month', 'year', 'custom'] as StatsPeriod[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  'px-4 py-2 text-xs font-bold rounded-xl transition-all capitalize tracking-wider',
+                  period === p
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300',
+                )}
+              >
+                {p === 'custom' ? t('statsPeriodCustom') : p}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex p-1 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 self-start">
-          {(['day', 'week', 'month', 'year'] as TimePeriod[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
+        {period === 'custom' && (
+          <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('statsFrom')}</label>
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className={cn('h-11 font-bold tabular-nums', UI_CONSTANTS.buttonRadius)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('statsTo')}</label>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className={cn('h-11 font-bold tabular-nums', UI_CONSTANTS.buttonRadius)}
+              />
+            </div>
+            <Button
+              type="button"
+              onClick={() => setAppliedCustom({ from: customFrom, to: customTo })}
+              className={cn('h-11 bg-indigo-600 font-bold uppercase text-[10px] tracking-widest', UI_CONSTANTS.buttonRadius)}
+            >
+              {t('statsApplyRange')}
+            </Button>
+          </div>
+        )}
+      </header>
+
+      <section className="space-y-4">
+        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">{t('statsOverview')}</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {deedsByPillarData.map((item) => (
+            <Card
+              key={item.pillar}
               className={cn(
-                'px-6 py-2 text-xs font-bold rounded-xl transition-all capitalize tracking-wider',
-                period === p
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                  : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300',
+                'rounded-2xl border p-4 shadow-md',
+                item.objectiveMet
+                  ? 'border-amber-500/40 bg-amber-500/5 dark:bg-amber-500/10'
+                  : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900',
               )}
             >
-              {p}
-            </button>
+              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: PILLAR_COLORS[item.pillar] }}>
+                {item.name}
+              </p>
+              <p className="mt-2 text-2xl font-black tabular-nums text-zinc-900 dark:text-white">{item.labelText}</p>
+              <p className="mt-1 text-[10px] font-bold text-zinc-500">
+                {item.target > 0 ? t('statsVsObjective') : '—'}
+                {item.objectiveMet && (
+                  <Star className="ml-1 inline h-3 w-3 fill-amber-500 text-amber-500" aria-hidden />
+                )}
+              </p>
+            </Card>
           ))}
         </div>
-      </header>
+      </section>
 
       <section className="space-y-6">
         <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">{t('activityOverTime')}</h2>
@@ -256,10 +379,10 @@ export function Stats() {
           ) : (
             <div className="h-72 w-full min-h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
+                <ComposedChart
                   data={timeSeriesData}
                   margin={{
-                    top: 8,
+                    top: 16,
                     right: 8,
                     left: 4,
                     bottom: period === 'day' ? 36 : 16,
@@ -276,7 +399,7 @@ export function Stats() {
                   />
                   <Tooltip
                     cursor={{ fill: 'rgba(99, 102, 241, 0.08)', radius: 8 }}
-                    content={<TimeSeriesTooltip lang={lang} />}
+                    content={<TimeSeriesTooltip lang={lang} t={t} />}
                   />
                   <Legend
                     wrapperStyle={{ fontSize: 10, fontWeight: 700 }}
@@ -291,7 +414,22 @@ export function Stats() {
                       barSize={period === 'month' ? 8 : 28}
                     />
                   ))}
-                </BarChart>
+                  <Line type="monotone" dataKey="total" stroke="#a1a1aa" strokeWidth={1} dot={false} legendType="none" />
+                  {objectiveDots.map((row) => (
+                    <ReferenceDot
+                      key={String(row.date ?? row.name)}
+                      x={row.name as string}
+                      y={Number(row.total)}
+                      r={0}
+                      label={{
+                        value: '★',
+                        position: 'top',
+                        fill: '#f59e0b',
+                        fontSize: 14,
+                      }}
+                    />
+                  ))}
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           )}
@@ -312,7 +450,7 @@ export function Stats() {
             ) : (
               <div className="h-64 w-full min-h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={deedsByPillarData} layout="vertical" margin={{ left: 4, right: 30 }}>
+                  <BarChart data={deedsByPillarData} layout="vertical" margin={{ left: 4, right: 36 }}>
                     <XAxis type="number" hide />
                     <YAxis
                       dataKey="pillar"
@@ -337,8 +475,7 @@ export function Stats() {
                       cursor={{ fill: 'rgba(99, 102, 241, 0.07)' }}
                       content={({ active, payload: tipPayload }) => {
                         if (!active || !tipPayload?.length) return null;
-                        const row = tipPayload[0].payload as { pillar: Pillar };
-                        const val = tipPayload[0].value;
+                        const row = tipPayload[0].payload as { pillar: Pillar; target: number; count: number; objectiveMet: boolean };
                         return (
                           <div
                             className={cn(
@@ -351,8 +488,17 @@ export function Stats() {
                               {PILLAR_LABELS[lang][row.pillar]}
                             </p>
                             <p className="mt-1.5 font-bold text-zinc-800 dark:text-zinc-100">
-                              {t('statsTooltipDeeds')}: {val}
+                              {t('statsTooltipDeeds')}: {row.count}
+                              {row.target > 0 ? ` / ${row.target} ${t('statsVsObjective')}` : ''}
                             </p>
+                            {row.objectiveMet ? (
+                              <p className="mt-1 flex items-center gap-1 text-amber-600">
+                                <Star className="h-3 w-3 fill-current" />
+                                {t('statsObjectiveMet')}
+                              </p>
+                            ) : row.target > 0 ? (
+                              <p className="mt-1 text-zinc-500">{t('statsObjectiveMissed')}</p>
+                            ) : null}
                           </div>
                         );
                       }}
@@ -362,7 +508,7 @@ export function Stats() {
                         <Cell key={`cell-${index}`} fill={PILLAR_COLORS[entry.pillar as keyof typeof PILLAR_COLORS]} />
                       ))}
                       <LabelList
-                        dataKey="count"
+                        dataKey="labelText"
                         position="right"
                         offset={8}
                         className="fill-zinc-600 dark:fill-zinc-300"
@@ -380,7 +526,7 @@ export function Stats() {
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">{t('durationMinutes')}</h2>
-            <span className="text-[10px] font-black text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-lg uppercase">Minutes spent</span>
+            <span className="text-[10px] font-black text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-lg uppercase">Minutes</span>
           </div>
           <Card className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl shadow-xl">
             {isLoading ? (
@@ -388,7 +534,7 @@ export function Stats() {
             ) : (
               <div className="h-64 w-full min-h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={durationByPillarData} layout="vertical" margin={{ left: 4, right: 30 }}>
+                  <BarChart data={durationByPillarData} layout="vertical" margin={{ left: 4, right: 44 }}>
                     <XAxis type="number" hide />
                     <YAxis
                       dataKey="pillar"
@@ -401,7 +547,7 @@ export function Stats() {
                         const y = Number(props.y);
                         const payload = props.payload as { value: Pillar };
                         const p = payload.value;
-                        if (!PILLARS.includes(p)) return <g />;
+                        if (p === 'heartset') return <g />;
                         return (
                           <text x={x} y={y} dy={4} textAnchor="end" fill={PILLAR_COLORS[p]} fontSize={11} fontWeight={800}>
                             {PILLAR_LABELS[lang][p]}
@@ -413,8 +559,12 @@ export function Stats() {
                       cursor={{ fill: 'rgba(99, 102, 241, 0.07)' }}
                       content={({ active, payload: tipPayload }) => {
                         if (!active || !tipPayload?.length) return null;
-                        const row = tipPayload[0].payload as { pillar: Pillar };
-                        const val = tipPayload[0].value;
+                        const row = tipPayload[0].payload as {
+                          pillar: Pillar;
+                          duration: number;
+                          target: number;
+                          objectiveMet: boolean;
+                        };
                         return (
                           <div
                             className={cn(
@@ -427,8 +577,14 @@ export function Stats() {
                               {PILLAR_LABELS[lang][row.pillar]}
                             </p>
                             <p className="mt-1.5 font-bold text-zinc-800 dark:text-zinc-100">
-                              {t('statsTooltipDuration')}: {val} min
+                              {t('statsTooltipDuration')}: {row.duration} min
+                              {row.target > 0 ? ` / ${row.target} min ${t('statsVsObjective')}` : ''}
                             </p>
+                            {row.target > 0 && (
+                              <p className={cn('mt-1 font-bold', row.objectiveMet ? 'text-amber-600' : 'text-zinc-500')}>
+                                {row.objectiveMet ? t('statsObjectiveMet') : t('statsObjectiveMissed')}
+                              </p>
+                            )}
                           </div>
                         );
                       }}
@@ -438,13 +594,12 @@ export function Stats() {
                         <Cell key={`cell-${index}`} fill={PILLAR_COLORS[entry.pillar as keyof typeof PILLAR_COLORS]} />
                       ))}
                       <LabelList
-                        dataKey="duration"
+                        dataKey="labelText"
                         position="right"
                         offset={8}
                         className="fill-zinc-600 dark:fill-zinc-300"
-                        fontSize={10}
+                        fontSize={9}
                         fontWeight={800}
-                        formatter={(val) => `${Number(val)}m`}
                       />
                     </Bar>
                   </BarChart>
@@ -472,7 +627,7 @@ export function Stats() {
                     <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
-                        style={{ width: `${((count as number) / deeds.length) * 100}%` }}
+                        style={{ width: `${((count as number) / Math.max(deeds.length, 1)) * 100}%` }}
                       />
                     </div>
                   </div>
@@ -501,11 +656,11 @@ export function Stats() {
                 )}
               >
                 <SelectItem value="all">{t('allPillars')}</SelectItem>
-                <SelectItem value="soulset">{PILLAR_LABELS[profile?.language || 'en'].soulset}</SelectItem>
-                <SelectItem value="healthset">{PILLAR_LABELS[profile?.language || 'en'].healthset}</SelectItem>
-                <SelectItem value="mindset">{PILLAR_LABELS[profile?.language || 'en'].mindset}</SelectItem>
-                <SelectItem value="skillset">{PILLAR_LABELS[profile?.language || 'en'].skillset}</SelectItem>
-                <SelectItem value="heartset">{PILLAR_LABELS[profile?.language || 'en'].heartset}</SelectItem>
+                {PILLARS.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {PILLAR_LABELS[profile?.language || 'en'][p]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </SectionHeader>

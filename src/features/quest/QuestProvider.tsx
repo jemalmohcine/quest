@@ -73,11 +73,12 @@ export function QuestProvider({ children }: { children: React.ReactNode }) {
         language: row.language === 'fr' ? 'fr' : 'en',
         theme: row.theme === 'dark' || row.theme === 'light' || row.theme === 'system' ? row.theme : 'system',
         daily_objective: row.daily_objective,
-        objective_per_pillar: row.objective_per_pillar as ProfileUpsertBody['objective_per_pillar'],
-        custom_feelings: row.custom_feelings ?? [],
-        photo_url: row.photo_url ?? undefined,
-      });
-      if (insErr) {
+      objective_per_pillar: row.objective_per_pillar as ProfileUpsertBody['objective_per_pillar'],
+      duration_objective_per_pillar: row.duration_objective_per_pillar as ProfileUpsertBody['duration_objective_per_pillar'],
+      custom_feelings: row.custom_feelings ?? [],
+      photo_url: row.photo_url ?? undefined,
+    });
+    if (insErr) {
         console.error('[quest] profile insert', insErr);
         setProfile(base);
         return;
@@ -221,6 +222,10 @@ export function QuestProvider({ children }: { children: React.ReactNode }) {
         ...(updates.objectivePerPillar ?? {}),
       },
       customFeelings: updates.customFeelings ?? current.customFeelings,
+      durationObjectivePerPillar: {
+        ...current.durationObjectivePerPillar,
+        ...(updates.durationObjectivePerPillar ?? {}),
+      },
     };
     if (updates.theme) {
       persistTheme(updates.theme);
@@ -233,6 +238,7 @@ export function QuestProvider({ children }: { children: React.ReactNode }) {
       theme: row.theme === 'dark' || row.theme === 'light' || row.theme === 'system' ? row.theme : 'system',
       daily_objective: row.daily_objective,
       objective_per_pillar: row.objective_per_pillar as ProfileUpsertBody['objective_per_pillar'],
+      duration_objective_per_pillar: row.duration_objective_per_pillar as ProfileUpsertBody['duration_objective_per_pillar'],
       custom_feelings: row.custom_feelings ?? [],
       photo_url: row.photo_url ?? undefined,
     });

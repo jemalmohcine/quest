@@ -16,6 +16,8 @@ import { Loader2 } from 'lucide-react';
 import { enUS, fr } from 'date-fns/locale';
 import { DeedDateTimeComboField } from './DeedDateTimeFields';
 import { useDeedsRefreshStore } from '@/stores';
+import { DurationValueField } from './DurationValueField';
+import { parseDurationInput, formatMinutesForDisplay, type DurationUnit } from '@/lib/duration-units';
 
 interface EditDeedDialogProps {
   deed: Deed | null;
@@ -29,6 +31,7 @@ export function EditDeedDialog({ deed, onClose }: EditDeedDialogProps) {
   const [actionName, setActionName] = useState('');
   const [pillar, setPillar] = useState<Pillar>('soulset');
   const [duration, setDuration] = useState('');
+  const [durationUnit, setDurationUnit] = useState<DurationUnit>('minutes');
   const [feeling, setFeeling] = useState('');
   const [thought, setThought] = useState('');
   const [dateStr, setDateStr] = useState('');
@@ -39,7 +42,7 @@ export function EditDeedDialog({ deed, onClose }: EditDeedDialogProps) {
     if (!deed) return;
     setActionName(deed.actionName);
     setPillar(deed.pillar);
-    setDuration(deed.duration != null ? String(deed.duration) : '');
+    setDuration(deed.duration != null ? formatMinutesForDisplay(deed.duration, durationUnit) : '');
     setFeeling(deed.feeling);
     setThought(deed.thought || '');
     setDateStr(deed.date);
@@ -66,9 +69,11 @@ export function EditDeedDialog({ deed, onClose }: EditDeedDialogProps) {
         ...meta,
         created_at: when.toISOString(),
       };
-      if (duration.trim()) {
-        const du = parseInt(duration, 10);
-        payload.duration = Number.isNaN(du) ? null : Math.max(0, du);
+      if (pillar === 'heartset') {
+        payload.duration = null;
+      } else if (duration.trim()) {
+        const du = parseDurationInput(duration, durationUnit);
+        payload.duration = du != null ? Math.max(0, du) : null;
       } else {
         payload.duration = null;
       }
@@ -105,7 +110,15 @@ export function EditDeedDialog({ deed, onClose }: EditDeedDialogProps) {
           <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
             <div className="min-w-0 space-y-2">
               <Label className="text-[10px] font-black uppercase text-zinc-600 dark:text-zinc-400">{t('pillar')}</Label>
-              <Select value={pillar} onValueChange={(v) => v && setPillar(v as Pillar)}>
+              <Select
+                value={pillar}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  const next = v as Pillar;
+                  setPillar(next);
+                  if (next === 'heartset') setDuration('');
+                }}
+              >
                 <SelectTrigger className={cn('w-full', UI_CONSTANTS.buttonRadius)}>
                   <SelectValue />
                 </SelectTrigger>
@@ -118,19 +131,21 @@ export function EditDeedDialog({ deed, onClose }: EditDeedDialogProps) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="min-w-0 space-y-2">
-              <Label className="text-[10px] font-black uppercase text-zinc-600 dark:text-zinc-400">{t('duration')}</Label>
-              <Input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                className={cn('w-full', UI_CONSTANTS.buttonRadius)}
-              />
-            </div>
+            {pillar !== 'heartset' ? (
+              <div className="min-w-0 space-y-2">
+                <Label className="text-[10px] font-black uppercase text-zinc-600 dark:text-zinc-400">{t('duration')}</Label>
+                <DurationValueField
+                  value={duration}
+                  unit={durationUnit}
+                  onValueChange={setDuration}
+                  onUnitChange={setDurationUnit}
+                />
+              </div>
+            ) : (
+              <div className="min-w-0 flex items-end">
+                <p className="text-[10px] font-medium text-zinc-500">{t('heartsetNoDuration')}</p>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

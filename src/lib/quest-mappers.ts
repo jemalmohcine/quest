@@ -1,5 +1,6 @@
 import type { UserProfile, Deed, Pillar } from '../types';
 import { PILLARS } from '../types';
+import { parseDurationObjectivesFromDb } from '@/lib/objectives';
 
 type ProfileRow = {
   id: string;
@@ -9,6 +10,7 @@ type ProfileRow = {
   theme: string;
   daily_objective: number;
   objective_per_pillar: Record<string, number>;
+  duration_objective_per_pillar?: Record<string, unknown> | null;
   custom_feelings: string[];
   photo_url?: string | null;
   created_at?: string;
@@ -32,6 +34,7 @@ export function profileRowToUserProfile(row: ProfileRow): UserProfile {
     theme: row.theme === 'dark' || row.theme === 'light' || row.theme === 'system' ? row.theme : 'system',
     dailyObjective: row.daily_objective ?? 5,
     objectivePerPillar,
+    durationObjectivePerPillar: parseDurationObjectivesFromDb(row.duration_objective_per_pillar ?? undefined),
     customFeelings: Array.isArray(row.custom_feelings) ? row.custom_feelings : [],
     photoURL: row.photo_url ?? undefined,
   };
@@ -50,6 +53,7 @@ export function userProfileToUpsertRow(
     theme: profile.theme,
     daily_objective: profile.dailyObjective,
     objective_per_pillar: profile.objectivePerPillar,
+    duration_objective_per_pillar: profile.durationObjectivePerPillar ?? {},
     custom_feelings: profile.customFeelings ?? [],
     photo_url: profile.photoURL ?? null,
   };
