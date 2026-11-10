@@ -106,6 +106,18 @@ jobs:
             --dry-run \
             --yes
 
+      - name: Repair legacy migration history (20261110 → filename version)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.baseline_repair == true || inputs.dry_run == true)) }}
+        env:
+          SUPABASE_DB_URL: ${{ steps.db_url.outputs.encoded_db_url }}
+        run: |
+          set -euo pipefail
+          # Older pushes recorded version "20261110" while CLI tracks full migration filenames.
+          supabase migration repair 20261110 --status reverted \
+            --db-url "$SUPABASE_DB_URL" --yes 2>/dev/null || true
+          supabase migration repair 20261110_duration_objectives --status applied \
+            --db-url "$SUPABASE_DB_URL" --yes 2>/dev/null || true
+
       - name: Push pending migrations
         if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.baseline_repair == true || inputs.dry_run == true)) }}
         env:
