@@ -1,0 +1,6 @@
+# Minimal config for Supabase CLI in CI (`db push`, `migration repair`).
+# Production project ref: qssepwnlviiazracsujq
+project_id = "quest"
+
+[db]
+major_version = 15

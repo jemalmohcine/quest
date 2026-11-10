@@ -25,7 +25,7 @@ export const siteConfig = {
     'Quest app',
   ],
   locale: 'fr_FR',
-  /** URL canonique du site (SEO, Open Graph). Ex. https://quest.app */
+  /** URL canonique du site (SEO, Open Graph). Prod: https://quest-v0.vercel.app */
   url: resolvePublicSiteUrl(),
   twitter: '@questapp',
 } as const;
