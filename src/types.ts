@@ -1,4 +1,11 @@
+import type { DurationUnit } from '@/lib/duration-units';
+
 export type Pillar = 'soulset' | 'healthset' | 'mindset' | 'skillset' | 'heartset';
+
+export interface DurationObjective {
+  value: number;
+  unit: DurationUnit;
+}
 
 export type Feeling =
   | 'happy'
@@ -20,7 +27,10 @@ export interface UserProfile {
   theme: 'light' | 'dark' | 'system';
   /** Somme des objectifs par pilier (affichage / compat). */
   dailyObjective: number;
+  /** Nombre d'actes visés par jour, par pilier. */
   objectivePerPillar: Record<Pillar, number>;
+  /** Durée visée par jour (minutes normalisées côté stats), par pilier. */
+  durationObjectivePerPillar?: Partial<Record<Pillar, DurationObjective>>;
   /** Sentiments supplémentaires saisis par l'utilisateur (slug lowercase). */
   customFeelings?: string[];
   photoURL?: string;

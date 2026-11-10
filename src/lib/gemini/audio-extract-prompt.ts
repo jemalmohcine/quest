@@ -23,7 +23,8 @@ Return JSON with:
 - actionName: short title in ${lang}, faithful to their words (light polish OK, no marketing fluff)
 - duration: minutes as a number if they stated a duration, else null
 - feeling: exactly one of: ${feelingChoices.join(', ')}
-- thought: one short reflective sentence only if they expressed a reflection, else null
+- thought: if they shared reflections, ideas, or feelings beyond the action title, copy their words VERBATIM (full transcription). Do NOT summarize, shorten, or paraphrase. If they only described the deed with no separate reflection, use null.
+- thoughtSummary: optional one-line summary ONLY when thought is long; otherwise null. Never replace thought with this summary.
 
-Language for actionName and thought: ${lang}.`;
+Language for actionName: ${lang}. Keep thought in the speaker's original language.`;
 }

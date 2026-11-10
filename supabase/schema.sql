@@ -11,6 +11,7 @@ create table if not exists public.profiles (
   theme text not null default 'system',
   daily_objective integer not null default 5,
   objective_per_pillar jsonb not null default '{"soulset":1,"healthset":1,"mindset":1,"skillset":1,"heartset":1}',
+  duration_objective_per_pillar jsonb not null default '{}',
   custom_feelings jsonb not null default '[]',
   photo_url text,
   created_at timestamptz not null default now()

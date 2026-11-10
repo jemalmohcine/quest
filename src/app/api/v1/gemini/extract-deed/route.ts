@@ -52,6 +52,7 @@ export async function POST(request: Request) {
             duration: { type: Type.NUMBER, nullable: true },
             feeling: { type: Type.STRING, enum: feelingChoices, nullable: true },
             thought: { type: Type.STRING, nullable: true },
+            thoughtSummary: { type: Type.STRING, nullable: true },
           },
           required: ['pillar', 'actionName'],
         },

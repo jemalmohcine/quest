@@ -18,6 +18,7 @@ export const questApi = {
       theme?: string;
       daily_objective?: number;
       objective_per_pillar?: Record<string, number>;
+      duration_objective_per_pillar?: Record<string, unknown>;
       custom_feelings?: string[];
       photo_url?: string | null;
     },

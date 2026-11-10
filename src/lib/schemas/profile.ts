@@ -1,4 +1,16 @@
 import { z } from 'zod';
+export const durationObjectiveSchema = z.object({
+  value: z.number().min(0).max(9999),
+  unit: z.enum(['minutes', 'hours', 'days', 'months']),
+});
+
+export const durationObjectivePerPillarSchema = z.object({
+  soulset: durationObjectiveSchema.optional(),
+  healthset: durationObjectiveSchema.optional(),
+  mindset: durationObjectiveSchema.optional(),
+  skillset: durationObjectiveSchema.optional(),
+  heartset: durationObjectiveSchema.optional(),
+});
 
 export const objectivePerPillarSchema = z.object({
   soulset: z.number().int().min(0).max(99),
@@ -14,6 +26,7 @@ export const profilePatchSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']).optional(),
   dailyObjective: z.number().int().min(1).max(500).optional(),
   objectivePerPillar: objectivePerPillarSchema.optional(),
+  durationObjectivePerPillar: durationObjectivePerPillarSchema.optional(),
   customFeelings: z.array(z.string().trim().max(40)).max(50).optional(),
   photoURL: z.string().max(3_000_000).optional().nullable(),
 });
@@ -27,6 +40,7 @@ export const profileUpsertBodySchema = z.object({
   theme: z.enum(['light', 'dark', 'system']),
   daily_objective: z.number().int().min(1).max(1000),
   objective_per_pillar: objectivePerPillarSchema,
+  duration_objective_per_pillar: durationObjectivePerPillarSchema.default({}),
   custom_feelings: z.array(z.string().max(80)).max(50),
   photo_url: z.string().nullable().optional(),
 });

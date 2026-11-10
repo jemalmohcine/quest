@@ -15,6 +15,7 @@ import { LayoutDashboard, BarChart3, FileText, MoreHorizontal, Plus, Loader2, Mi
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useShellStore } from '@/stores/shell-store';
+import { FloatingQuestWidget } from './FloatingQuestWidget';
 
 export function QuestShell() {
   const { user, loading, t } = useQuest();
@@ -183,6 +184,7 @@ export function QuestShell() {
           </nav>
         </div>
 
+        <FloatingQuestWidget />
         <AddDeedModal isOpen={addModalOpen} onClose={() => setAddModalOpen(false)} />
         <AudioAssistant isOpen={audioOpen} onClose={() => setAudioOpen(false)} />
       </div>

@@ -17,6 +17,8 @@ import { format } from 'date-fns';
 import { enUS, fr } from 'date-fns/locale';
 import { DeedDateTimeComboField } from './DeedDateTimeFields';
 import { useDeedsRefreshStore } from '@/stores';
+import { DurationValueField } from './DurationValueField';
+import { parseDurationInput, formatMinutesForDisplay, type DurationUnit } from '@/lib/duration-units';
 
 interface AddDeedModalProps {
   isOpen: boolean;
@@ -31,6 +33,7 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
   const [pillar, setPillar] = useState<Pillar>('soulset');
   const [actionName, setActionName] = useState('');
   const [duration, setDuration] = useState('');
+  const [durationUnit, setDurationUnit] = useState<DurationUnit>('minutes');
   const [thought, setThought] = useState('');
   const [feeling, setFeeling] = useState<string>('happy');
   const [dateStr, setDateStr] = useState(() => format(new Date(), 'yyyy-MM-dd'));
@@ -107,7 +110,7 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
     const historyKey = `${pillar}:${suggestion}`;
     const pastData = history[historyKey];
     if (pastData) {
-      setDuration(pastData.lastDuration);
+      setDuration(pastData.lastDuration ? formatMinutesForDisplay(parseInt(pastData.lastDuration, 10) || 0, durationUnit) : '');
       setFeeling(pastData.lastFeeling);
     }
   };
@@ -125,10 +128,10 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
         dateStr,
         timeStr,
         ...(thought.trim() ? { thought: thought.trim() } : {}),
-        ...(duration
+        ...(pillar !== 'heartset' && duration
           ? (() => {
-              const du = parseInt(duration, 10);
-              return !Number.isNaN(du) ? { duration: Math.max(0, du) } : {};
+              const du = parseDurationInput(duration, durationUnit);
+              return du != null && du > 0 ? { duration: du } : {};
             })()
           : {}),
       };
@@ -221,7 +224,15 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
               <Label htmlFor="pillar" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
                 {t('pillar')} *
               </Label>
-              <Select value={pillar} onValueChange={(v: string | null) => v && setPillar(v as Pillar)}>
+              <Select
+                value={pillar}
+                onValueChange={(v: string | null) => {
+                  if (!v) return;
+                  const next = v as Pillar;
+                  setPillar(next);
+                  if (next === 'heartset') setDuration('');
+                }}
+              >
                 <SelectTrigger
                   className={cn(
                     'box-border h-11 min-h-11 w-full shrink-0 bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:ring-indigo-500 text-zinc-900 dark:text-white font-bold',
@@ -240,26 +251,25 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
               </Select>
             </div>
 
-            <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor="duration" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
-                {t('duration')}
-              </Label>
-              <Input
-                id="duration"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                placeholder="30"
-                value={duration}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDuration(e.target.value)}
-                onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                className={cn(
-                  'box-border h-11 min-h-11 max-h-11 w-full py-0 leading-none bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:ring-indigo-500 text-zinc-900 dark:text-white font-bold tabular-nums',
-                  UI_CONSTANTS.buttonRadius,
-                )}
-              />
-            </div>
+            {pillar !== 'heartset' ? (
+              <div className="min-w-0 flex-1 space-y-2">
+                <Label htmlFor="duration" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
+                  {t('duration')}
+                </Label>
+                <DurationValueField
+                  id="duration"
+                  value={duration}
+                  unit={durationUnit}
+                  onValueChange={setDuration}
+                  onUnitChange={setDurationUnit}
+                  className="w-full"
+                />
+              </div>
+            ) : (
+              <div className="min-w-0 flex-1 flex items-end">
+                <p className="pb-3 text-[10px] font-bold text-zinc-500">{t('heartsetNoDuration')}</p>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
