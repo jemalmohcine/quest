@@ -40,6 +40,7 @@ jobs:
         run: supabase --version
 
       - name: Require database URL secret
+        id: db_url
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -55,11 +56,27 @@ jobs:
               exit 1
               ;;
           esac
+          # Supabase CLI requires a percent-encoded connection string (especially the password).
+          encoded="$(python3 -c "
+          import os, re, sys
+          from urllib.parse import quote, unquote
+          raw = os.environ['SUPABASE_DB_URL'].strip()
+          m = re.match(r'^(postgres(?:ql)?)://([^:@/]+):([^@]+)@([^?#]+)(.*)$', raw)
+          if not m:
+            print('::error::Could not parse SUPABASE_DB_URL user/password/host.', file=sys.stderr)
+            sys.exit(1)
+          scheme, user, password, hostport, rest = m.groups()
+          # Decode then re-encode to fix mixed/invalid % sequences in the stored secret.
+          password_enc = quote(unquote(password), safe='')
+          user_enc = quote(unquote(user), safe='')
+          print(f'{scheme}://{user_enc}:{password_enc}@{hostport}{rest}')
+          ")"
+          echo "encoded_db_url=${encoded}" >> "$GITHUB_OUTPUT"
 
       - name: Baseline repair (workflow_dispatch only)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_repair == true }}
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_URL: ${{ steps.db_url.outputs.encoded_db_url }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -81,7 +98,7 @@ jobs:
       - name: Dry run (workflow_dispatch only)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && inputs.baseline_repair != true }}
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_URL: ${{ steps.db_url.outputs.encoded_db_url }}
         run: |
           set -euo pipefail
           supabase db push \
@@ -94,7 +111,7 @@ jobs:
       - name: Push pending migrations
         if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.baseline_repair == true || inputs.dry_run == true)) }}
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_URL: ${{ steps.db_url.outputs.encoded_db_url }}
         run: |
           set -euo pipefail
           # --include-all: apply local migrations missing from remote history (safe with IF NOT EXISTS SQL).

@@ -43,7 +43,7 @@ postgresql://postgres:[PASSWORD]@db.qssepwnlviiazracsujq.supabase.co:5432/postgr
 
 Do **not** commit this URL. No access token is required when using the full database URL.
 
-Optional: URL-encode special characters in the password (`@`, `#`, etc.).
+You may store the password **unescaped** in the secret (e.g. `&`, `%`, `@`); the workflow re-encodes it before calling the Supabase CLI.
 
 ### Idempotency & baseline
 
