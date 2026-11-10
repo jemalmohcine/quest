@@ -15,3 +15,16 @@ export const UI_CONSTANTS = {
   inputRadius: 'rounded-xl',
   iconRadius: 'rounded-2xl',
 };
+
+/** Mobile shell: bottom nav + FAB column + progress widget (safe-area aware). */
+export const MOBILE_SHELL = {
+  /** Space reserved at bottom of scrollable main on <md */
+  mainPaddingBottom:
+    'pb-[calc(9.25rem+env(safe-area-inset-bottom,0px))] md:pb-8',
+  /** Fixed FAB stack (mic + log) above bottom nav */
+  fabBottom:
+    'bottom-[calc(7.5rem+env(safe-area-inset-bottom,0px))]',
+  /** Progress / timer widget — left side, below FABs vertically */
+  widgetBottom:
+    'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))]',
+} as const;

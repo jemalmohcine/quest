@@ -36,7 +36,7 @@ export function DurationValueField({
   const { t } = useQuest();
 
   return (
-    <div className={cn('flex gap-2', className)}>
+    <div className={cn('flex flex-col gap-2 sm:flex-row', className)}>
       <Input
         id={id}
         type="number"
@@ -48,14 +48,14 @@ export function DurationValueField({
         onWheel={(e) => (e.target as HTMLInputElement).blur()}
         disabled={disabled}
         className={cn(
-          'box-border h-11 min-h-11 max-h-11 min-w-0 flex-1 py-0 leading-none tabular-nums',
+          'box-border h-12 min-h-11 max-h-12 min-w-0 w-full flex-1 py-0 text-base leading-none tabular-nums sm:h-11 sm:max-h-11 sm:text-sm',
           UI_CONSTANTS.buttonRadius,
         )}
       />
       <Select value={unit} onValueChange={(v) => v && onUnitChange(v as DurationUnit)} disabled={disabled}>
         <SelectTrigger
           className={cn(
-            'box-border h-11 min-h-11 w-[7.25rem] shrink-0 text-[10px] font-black uppercase tracking-wide',
+            'box-border h-12 min-h-11 w-full shrink-0 text-xs font-black uppercase tracking-wide sm:h-11 sm:w-[7.25rem]',
             UI_CONSTANTS.buttonRadius,
           )}
         >
