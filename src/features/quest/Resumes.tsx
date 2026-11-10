@@ -12,6 +12,7 @@ import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
 import { UI_CONSTANTS } from '@/constants';
 import { SectionHeader } from './SectionHeader';
+import { formatDeedDurationPhrase } from '@/lib/duration-units';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeedsRefreshStore } from '@/stores';
 import { clientApiUrl } from '@/lib/client-api-url';
@@ -123,7 +124,12 @@ export function Resumes() {
     setIsGenerating(true);
     setError(null);
     try {
-      const deedsSummary = deeds.map((d) => `- [${d.date}] ${d.pillar}: ${d.actionName} (${d.duration || 'N/A'} min)`).join('\n');
+      const deedsSummary = deeds
+        .map((d) => {
+          const dur = formatDeedDurationPhrase(d, t);
+          return `- [${d.date}] ${d.pillar}: ${d.actionName} (${dur || 'N/A'})`;
+        })
+        .join('\n');
 
       const res = await fetch(clientApiUrl('/api/v1/gemini/weekly-narrative'), {
         method: 'POST',

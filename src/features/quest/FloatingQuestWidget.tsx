@@ -64,16 +64,20 @@ export function FloatingQuestWidget() {
       setMessage(t('actionNameRequired'));
       return;
     }
-    const minutes = running ? stop() : Math.max(1, Math.round(elapsedMs / 60000));
+    if (running) stop();
+    const totalSec = Math.max(1, Math.round(elapsedMs / 1000));
     const meta = createDeedMetadata();
     const p = pillar ?? 'skillset';
+    const durationUnit = totalSec < 60 ? ('seconds' as const) : ('minutes' as const);
     const payload = {
       pillar: p,
       actionName: actionName.trim(),
       feeling: 'focused',
       dateStr: meta.date,
       timeStr: meta.time,
-      ...(p !== 'heartset' && minutes > 0 ? { duration: minutes } : {}),
+      ...(p !== 'heartset' && totalSec > 0
+        ? { durationSeconds: totalSec, durationUnit }
+        : {}),
     };
     const { error } = await questHttp.createDeed(payload);
     if (error) {

@@ -3,6 +3,33 @@ import { requireUser } from '@/lib/api/require-user';
 import { questApi } from '@/services/quest-api';
 import { deedCreateSchema } from '@/lib/schemas/deed';
 import { deedFieldsFromDateAndTime } from '@/lib/utils';
+import type { DurationUnit } from '@/lib/duration-units';
+
+function rowDurationFromCreate(data: {
+  pillar: string;
+  durationSeconds?: number | null;
+  durationUnit?: DurationUnit | null;
+  duration?: number | null;
+}): Record<string, unknown> {
+  if (data.pillar === 'heartset') {
+    return { duration: null, duration_seconds: null, duration_unit: null };
+  }
+  if (data.durationSeconds != null && data.durationSeconds > 0 && data.durationUnit) {
+    return {
+      duration_seconds: data.durationSeconds,
+      duration_unit: data.durationUnit,
+      duration: Math.max(0, Math.round(data.durationSeconds / 60)),
+    };
+  }
+  if (data.duration != null && data.duration > 0) {
+    return {
+      duration_seconds: data.duration * 60,
+      duration_unit: 'minutes',
+      duration: data.duration,
+    };
+  }
+  return {};
+}
 
 export async function GET(request: Request) {
   const { supabase, user, errorResponse } = await requireUser();
@@ -55,7 +82,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Validation' }, { status: 400 });
   }
 
-  const { dateStr, timeStr, pillar, actionName, feeling, thought, duration } = parsed.data;
+  const { dateStr, timeStr, pillar, actionName, feeling, thought } = parsed.data;
   const [y, mo, d] = dateStr.split('-').map((n) => parseInt(n, 10));
   const [hh, mi] = timeStr.split(':').map((n) => parseInt(n, 10));
   const when = new Date(y, mo - 1, d, hh || 0, mi || 0, 0, 0);
@@ -68,10 +95,10 @@ export async function POST(request: Request) {
     feeling: feeling.toLowerCase(),
     created_at: when.toISOString(),
     ...meta,
+    ...rowDurationFromCreate(parsed.data),
   };
   if (thought != null && String(thought).trim()) row.thought = String(thought).trim();
   else row.thought = null;
-  if (duration != null && !Number.isNaN(duration)) row.duration = duration;
 
   const result = await questApi.createDeed(supabase, row);
   if (result.error) {

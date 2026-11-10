@@ -15,7 +15,7 @@ import { UI_CONSTANTS } from '@/constants';
 import { useDeedsRefreshStore } from '@/stores';
 import { clientApiUrl } from '@/lib/client-api-url';
 import { DurationValueField } from './DurationValueField';
-import { parseDurationInput, type DurationUnit } from '@/lib/duration-units';
+import { deedDurationFieldsFromInput, type DurationUnit } from '@/lib/duration-units';
 
 interface AudioAssistantProps {
   isOpen: boolean;
@@ -75,6 +75,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
   const feelingChoices = allFeelingOptions(profile);
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [durationError, setDurationError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
@@ -272,22 +273,38 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
       return;
     }
 
+    if (reviewDraft.pillar !== 'heartset' && reviewDraft.duration.trim()) {
+      const parsed = deedDurationFieldsFromInput(reviewDraft.duration, reviewDraft.durationUnit);
+      if (!parsed.ok) {
+        setDurationError(parsed.code === 'missing_unit' ? t('durationUnitRequired') : t('durationInvalid'));
+        return;
+      }
+    }
+
     setIsSaving(true);
     setError(null);
+    setDurationError(null);
     try {
       const meta = createDeedMetadata();
+      const durationPart =
+        reviewDraft.pillar !== 'heartset' && reviewDraft.duration.trim()
+          ? (() => {
+              const parsed = deedDurationFieldsFromInput(reviewDraft.duration, reviewDraft.durationUnit);
+              return parsed.ok
+                ? {
+                    durationSeconds: parsed.fields.duration_seconds,
+                    durationUnit: parsed.fields.duration_unit,
+                  }
+                : {};
+            })()
+          : {};
       const payload = {
         pillar: reviewDraft.pillar,
         actionName: title,
         feeling: reviewDraft.feeling,
         dateStr: meta.date,
         timeStr: meta.time,
-        ...(reviewDraft.pillar !== 'heartset' && reviewDraft.duration.trim()
-          ? (() => {
-              const d = parseDurationInput(reviewDraft.duration, reviewDraft.durationUnit);
-              return d != null && d >= 0 ? { duration: d } : {};
-            })()
-          : {}),
+        ...durationPart,
         ...(reviewDraft.thought.trim() ? { thought: reviewDraft.thought.trim() } : {}),
       };
 
@@ -445,8 +462,15 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
                       <DurationValueField
                         value={reviewDraft.duration}
                         unit={reviewDraft.durationUnit}
-                        onValueChange={(val) => setReviewDraft((d) => (d ? { ...d, duration: val } : d))}
-                        onUnitChange={(u) => setReviewDraft((d) => (d ? { ...d, durationUnit: u } : d))}
+                        onValueChange={(val) => {
+                          setReviewDraft((d) => (d ? { ...d, duration: val } : d));
+                          if (durationError) setDurationError(null);
+                        }}
+                        onUnitChange={(u) => {
+                          setReviewDraft((d) => (d ? { ...d, durationUnit: u } : d));
+                          if (durationError) setDurationError(null);
+                        }}
+                        error={durationError}
                       />
                     </div>
                   ) : null}

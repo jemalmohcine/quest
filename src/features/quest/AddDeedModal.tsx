@@ -18,7 +18,11 @@ import { enUS, fr } from 'date-fns/locale';
 import { DeedDateTimeComboField } from './DeedDateTimeFields';
 import { useDeedsRefreshStore } from '@/stores';
 import { DurationValueField } from './DurationValueField';
-import { parseDurationInput, formatMinutesForDisplay, type DurationUnit } from '@/lib/duration-units';
+import {
+  deedDurationFieldsFromInput,
+  deedDurationFormState,
+  type DurationUnit,
+} from '@/lib/duration-units';
 
 interface AddDeedModalProps {
   isOpen: boolean;
@@ -39,7 +43,10 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
   const [dateStr, setDateStr] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [timeStr, setTimeStr] = useState(() => format(new Date(), 'HH:mm'));
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [history, setHistory] = useState<Record<string, { count: number; lastDuration: string; lastFeeling: string; pillar: Pillar }>>({});
+  const [durationError, setDurationError] = useState<string | null>(null);
+  const [history, setHistory] = useState<
+    Record<string, { count: number; lastDuration: string; lastDurationUnit: DurationUnit; lastFeeling: string; pillar: Pillar }>
+  >({});
   const feelingOptions = useMemo(() => allFeelingOptions(profile), [profile]);
 
   useEffect(() => {
@@ -65,13 +72,18 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
         return;
       }
       const deeds = mapDeedRows(data);
-      const stats: Record<string, { count: number; lastDuration: string; lastFeeling: string; pillar: Pillar }> = {};
+      const stats: Record<
+        string,
+        { count: number; lastDuration: string; lastDurationUnit: DurationUnit; lastFeeling: string; pillar: Pillar }
+      > = {};
       for (const d of deeds) {
         const key = `${d.pillar}:${d.actionName}`;
         if (!stats[key]) {
+          const dur = deedDurationFormState(d);
           stats[key] = {
             count: 0,
-            lastDuration: d.duration?.toString() || '',
+            lastDuration: dur.value,
+            lastDurationUnit: dur.unit,
             lastFeeling: d.feeling || 'happy',
             pillar: d.pillar,
           };
@@ -110,7 +122,9 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
     const historyKey = `${pillar}:${suggestion}`;
     const pastData = history[historyKey];
     if (pastData) {
-      setDuration(pastData.lastDuration ? formatMinutesForDisplay(parseInt(pastData.lastDuration, 10) || 0, durationUnit) : '');
+      setDuration(pastData.lastDuration);
+      setDurationUnit(pastData.lastDurationUnit);
+      setDurationError(null);
       setFeeling(pastData.lastFeeling);
     }
   };
@@ -119,8 +133,34 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
     e.preventDefault();
     if (!user || !actionName || !dateStr || !timeStr) return;
 
+    if (pillar !== 'heartset' && duration.trim()) {
+      const parsedDur = deedDurationFieldsFromInput(duration, durationUnit);
+      if (!parsedDur.ok) {
+        setDurationError(
+          parsedDur.code === 'missing_unit' ? t('durationUnitRequired') : t('durationInvalid'),
+        );
+        return;
+      }
+    } else {
+      setDurationError(null);
+    }
+
     setIsSubmitting(true);
     try {
+      const durationPart =
+        pillar !== 'heartset' && duration.trim()
+          ? (() => {
+              const parsedDur = deedDurationFieldsFromInput(duration, durationUnit);
+              if (parsedDur.ok) {
+                return {
+                  durationSeconds: parsedDur.fields.duration_seconds,
+                  durationUnit: parsedDur.fields.duration_unit,
+                };
+              }
+              return {};
+            })()
+          : {};
+
       const payload = {
         pillar,
         actionName: actionName.trim(),
@@ -128,12 +168,7 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
         dateStr,
         timeStr,
         ...(thought.trim() ? { thought: thought.trim() } : {}),
-        ...(pillar !== 'heartset' && duration
-          ? (() => {
-              const du = parseDurationInput(duration, durationUnit);
-              return du != null && du > 0 ? { duration: du } : {};
-            })()
-          : {}),
+        ...durationPart,
       };
 
       const { error } = await questHttp.createDeed(payload);
@@ -260,8 +295,15 @@ export function AddDeedModal({ isOpen, onClose }: AddDeedModalProps) {
                   id="duration"
                   value={duration}
                   unit={durationUnit}
-                  onValueChange={setDuration}
-                  onUnitChange={setDurationUnit}
+                  onValueChange={(v) => {
+                    setDuration(v);
+                    if (durationError) setDurationError(null);
+                  }}
+                  onUnitChange={(u) => {
+                    setDurationUnit(u);
+                    if (durationError) setDurationError(null);
+                  }}
+                  error={durationError}
                   className="w-full"
                 />
               </div>
