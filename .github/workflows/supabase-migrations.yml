@@ -1,0 +1,89 @@
+name: Supabase production migrations
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print pending migrations without applying SQL"
+        type: boolean
+        default: false
+      baseline_repair:
+        description: "Mark every migration file in this repo as already applied (no SQL). Use once if prod was built from schema.sql and SQL already matches."
+        type: boolean
+        default: false
+
+concurrency:
+  group: supabase-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply pending migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.67.1
+          # CLI v3+: use --remote "$SUPABASE_DB_URL" (equivalent to older --db-url).
+
+      - name: Require database URL secret
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "::error::GitHub secret SUPABASE_DB_URL is missing. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          case "$SUPABASE_DB_URL" in
+            postgresql://*|postgres://*) ;;
+            *)
+              echo "::error::SUPABASE_DB_URL must be a PostgreSQL connection URL (postgresql://...)."
+              exit 1
+              ;;
+          esac
+
+      - name: Baseline repair (workflow_dispatch only)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_repair == true }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(supabase/migrations/*.sql)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No migration files found."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            version="$(basename "$f" .sql)"
+            echo "Marking migration as applied: ${version}"
+            supabase migration repair "$version" --status applied --remote "$SUPABASE_DB_URL" --yes
+          done
+
+      - name: Dry run (workflow_dispatch only)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && inputs.baseline_repair != true }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase db push --remote "$SUPABASE_DB_URL" --dry-run --yes
+
+      - name: Push pending migrations
+        if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.baseline_repair == true || inputs.dry_run == true)) }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          # Applies only migrations not yet recorded in supabase_migrations.schema_migrations.
+          # Existing migration SQL uses IF NOT EXISTS where relevant so re-applying DDL is safe
+          # if the remote was partially updated manually before history existed.
+          supabase db push --remote "$SUPABASE_DB_URL" --yes

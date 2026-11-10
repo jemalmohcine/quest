@@ -2,6 +2,11 @@
   "name": "quest",
   "private": true,
   "version": "1.0.0",
+  "homepage": "https://quest-v0.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jemalmohcine/quest.git"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
