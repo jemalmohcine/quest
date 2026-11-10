@@ -120,6 +120,35 @@ export const questHttp = {
     return { data: json.data ?? null, error: null };
   },
 
+  async getResume(params: {
+    period_type: string;
+    period_start: string;
+    scope: string;
+  }): Promise<{ data: unknown; error: QuestHttpError | null }> {
+    const sp = new URLSearchParams(params);
+    const res = await fetch(clientApiUrl(`/api/v1/resumes?${sp}`), { credentials: 'same-origin' });
+    const json = await parseJson(res);
+    if (!res.ok) return { data: null, error: { message: errMessage(json, res.statusText) } };
+    return { data: json.data ?? null, error: null };
+  },
+
+  async generateResume(body: {
+    period_type: string;
+    period_start: string;
+    scope: string;
+    timeZone: string;
+  }): Promise<{ data: unknown; error: QuestHttpError | null }> {
+    const res = await fetch(clientApiUrl('/api/v1/resumes/generate'), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await parseJson(res);
+    if (!res.ok) return { data: null, error: { message: errMessage(json, res.statusText) } };
+    return { data: json.data ?? null, error: null };
+  },
+
   async putWeeklyResume(weekId: string, body: WeeklyResumePutBody): Promise<{ error: QuestHttpError | null }> {
     const res = await fetch(clientApiUrl(`/api/v1/weekly-resumes/${encodeURIComponent(weekId)}`), {
       method: 'PUT',

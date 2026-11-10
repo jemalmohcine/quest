@@ -45,9 +45,25 @@ create table if not exists public.weekly_resumes (
   unique (user_id, week_id)
 );
 
+create table if not exists public.resumes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  period_type text not null check (period_type in ('day', 'week', 'month')),
+  period_start text not null,
+  scope text not null,
+  narrative text not null,
+  audio_base64 text,
+  finalized_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (user_id, period_type, period_start, scope)
+);
+
+create index if not exists resumes_user_period_idx on public.resumes (user_id, period_type, period_start);
+
 alter table public.profiles enable row level security;
 alter table public.deeds enable row level security;
 alter table public.weekly_resumes enable row level security;
+alter table public.resumes enable row level security;
 
 drop policy if exists "profiles_select_own" on public.profiles;
 drop policy if exists "profiles_insert_own" on public.profiles;
@@ -62,6 +78,10 @@ drop policy if exists "resumes_select_own" on public.weekly_resumes;
 drop policy if exists "resumes_insert_own" on public.weekly_resumes;
 drop policy if exists "resumes_update_own" on public.weekly_resumes;
 
+drop policy if exists "resumes_v2_select_own" on public.resumes;
+drop policy if exists "resumes_v2_insert_own" on public.resumes;
+drop policy if exists "resumes_v2_update_own" on public.resumes;
+
 create policy "profiles_select_own" on public.profiles for select using (auth.uid() = id);
 create policy "profiles_insert_own" on public.profiles for insert with check (auth.uid() = id);
 create policy "profiles_update_own" on public.profiles for update using (auth.uid() = id);
@@ -74,3 +94,7 @@ create policy "deeds_delete_own" on public.deeds for delete using (auth.uid() = 
 create policy "resumes_select_own" on public.weekly_resumes for select using (auth.uid() = user_id);
 create policy "resumes_insert_own" on public.weekly_resumes for insert with check (auth.uid() = user_id);
 create policy "resumes_update_own" on public.weekly_resumes for update using (auth.uid() = user_id);
+
+create policy "resumes_v2_select_own" on public.resumes for select using (auth.uid() = user_id);
+create policy "resumes_v2_insert_own" on public.resumes for insert with check (auth.uid() = user_id);
+create policy "resumes_v2_update_own" on public.resumes for update using (auth.uid() = user_id);
