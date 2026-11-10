@@ -91,7 +91,6 @@ jobs:
             supabase migration repair "$version" \
               --status applied \
               --db-url "$SUPABASE_DB_URL" \
-              --linked false \
               --yes
           done
 
@@ -103,7 +102,6 @@ jobs:
           set -euo pipefail
           supabase db push \
             --db-url "$SUPABASE_DB_URL" \
-            --linked false \
             --include-all \
             --dry-run \
             --yes
@@ -117,6 +115,5 @@ jobs:
           # --include-all: apply local migrations missing from remote history (safe with IF NOT EXISTS SQL).
           supabase db push \
             --db-url "$SUPABASE_DB_URL" \
-            --linked false \
             --include-all \
             --yes
