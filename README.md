@@ -21,15 +21,21 @@ Supabase project ref: `qssepwnlviiazracsujq`
 
 ## Supabase migrations (CI)
 
-On every push to **`main`**, GitHub Actions runs [`.github/workflows/supabase-migrations.yml`](.github/workflows/supabase-migrations.yml) and applies **only pending** files under `supabase/migrations/` via the Supabase CLI (`supabase db push`).
+On every push to **`main`**, GitHub Actions runs [`.github/workflows/supabase-migrations.yml`](.github/workflows/supabase-migrations.yml) and applies files under `supabase/migrations/` via `supabase db push --db-url` (CLI **2.67.1**, with `--include-all` when the remote has no migration history yet).
 
 ### Required GitHub secret (Actions)
 
 | Secret | Required | Value |
 |--------|----------|--------|
-| **`SUPABASE_DB_URL`** | Yes | Postgres connection URI for the **production** database (direct connection, port **5432**, recommended for DDL). |
+| **`SUPABASE_DB_URL`** | Yes | Postgres connection URI for the **production** database (URL-encode the password if it contains special characters). |
 
-**Format example** (replace `[PASSWORD]` with the database password from Supabase → Project Settings → Database):
+**Format example** — session pooler (port **5432**) or direct DB host (replace `[PASSWORD]` from Supabase → Project Settings → Database):
+
+```text
+postgresql://postgres.qssepwnlviiazracsujq:[PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+```
+
+Direct DB (alternative):
 
 ```text
 postgresql://postgres:[PASSWORD]@db.qssepwnlviiazracsujq.supabase.co:5432/postgres
