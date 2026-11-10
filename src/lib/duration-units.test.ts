@@ -31,4 +31,10 @@ const phrase = formatDeedDurationPhrase(
 );
 assert(phrase === '60 seconds', 'display phrase');
 
+const oneMin = formatDeedDurationPhrase(
+  { durationSeconds: 60, durationUnit: 'minutes' },
+  (k) => (k === 'durationPhraseMinute' ? 'minute' : k === 'durationPhraseMinutes' ? 'minutes' : k),
+);
+assert(oneMin === '1 minute', 'singular minute');
+
 console.log('duration-units.test.ts: ok');
