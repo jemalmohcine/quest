@@ -19,6 +19,9 @@ concurrency:
   group: supabase-production-migrations
   cancel-in-progress: false
 
+env:
+  SUPABASE_CLI_VERSION: 2.67.1
+
 jobs:
   migrate:
     name: Apply pending migrations
@@ -31,8 +34,10 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.67.1
-          # CLI v3+: use --remote "$SUPABASE_DB_URL" (equivalent to older --db-url).
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      - name: Verify CLI version
+        run: supabase --version
 
       - name: Require database URL secret
         env:
@@ -66,7 +71,11 @@ jobs:
           for f in "${files[@]}"; do
             version="$(basename "$f" .sql)"
             echo "Marking migration as applied: ${version}"
-            supabase migration repair "$version" --status applied --remote "$SUPABASE_DB_URL" --yes
+            supabase migration repair "$version" \
+              --status applied \
+              --db-url "$SUPABASE_DB_URL" \
+              --linked false \
+              --yes
           done
 
       - name: Dry run (workflow_dispatch only)
@@ -75,7 +84,12 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          supabase db push --remote "$SUPABASE_DB_URL" --dry-run --yes
+          supabase db push \
+            --db-url "$SUPABASE_DB_URL" \
+            --linked false \
+            --include-all \
+            --dry-run \
+            --yes
 
       - name: Push pending migrations
         if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.baseline_repair == true || inputs.dry_run == true)) }}
@@ -83,7 +97,9 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          # Applies only migrations not yet recorded in supabase_migrations.schema_migrations.
-          # Existing migration SQL uses IF NOT EXISTS where relevant so re-applying DDL is safe
-          # if the remote was partially updated manually before history existed.
-          supabase db push --remote "$SUPABASE_DB_URL" --yes
+          # --include-all: apply local migrations missing from remote history (safe with IF NOT EXISTS SQL).
+          supabase db push \
+            --db-url "$SUPABASE_DB_URL" \
+            --linked false \
+            --include-all \
+            --yes
