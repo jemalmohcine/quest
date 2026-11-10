@@ -282,8 +282,10 @@ export function Stats() {
 
   const objectiveDots = timeSeriesData.filter((row) => row.objectiveMet && Number(row.total) > 0);
 
+  const activityBarSize = period === 'month' ? 8 : period === 'week' || period === 'custom' ? 18 : 24;
+
   return (
-    <div className="py-4 md:py-8 space-y-8">
+    <div className="max-w-full min-w-0 space-y-8 overflow-x-hidden py-4 md:py-8">
       <header className="flex flex-col gap-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -294,13 +296,19 @@ export function Stats() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 self-start">
+          <div
+            className={cn(
+              'flex w-full max-w-full gap-2 overflow-x-auto p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+              'snap-x snap-mandatory rounded-2xl border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900',
+            )}
+          >
             {(['day', 'week', 'month', 'year', 'custom'] as StatsPeriod[]).map((p) => (
               <button
                 key={p}
+                type="button"
                 onClick={() => setPeriod(p)}
                 className={cn(
-                  'px-4 py-2 text-xs font-bold rounded-xl transition-all capitalize tracking-wider',
+                  'min-h-11 shrink-0 snap-start whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-bold capitalize tracking-wider transition-all touch-manipulation',
                   period === p
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
                     : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300',
@@ -313,29 +321,38 @@ export function Stats() {
         </div>
 
         {period === 'custom' && (
-          <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('statsFrom')}</label>
+          <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-0 flex-1 space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500" htmlFor="stats-from">
+                {t('statsFrom')}
+              </label>
               <Input
+                id="stats-from"
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className={cn('h-11 font-bold tabular-nums', UI_CONSTANTS.buttonRadius)}
+                className={cn('h-12 min-h-11 w-full text-base font-bold tabular-nums sm:text-sm', UI_CONSTANTS.buttonRadius)}
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('statsTo')}</label>
+            <div className="min-w-0 flex-1 space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500" htmlFor="stats-to">
+                {t('statsTo')}
+              </label>
               <Input
+                id="stats-to"
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className={cn('h-11 font-bold tabular-nums', UI_CONSTANTS.buttonRadius)}
+                className={cn('h-12 min-h-11 w-full text-base font-bold tabular-nums sm:text-sm', UI_CONSTANTS.buttonRadius)}
               />
             </div>
             <Button
               type="button"
               onClick={() => setAppliedCustom({ from: customFrom, to: customTo })}
-              className={cn('h-11 bg-indigo-600 font-bold uppercase text-[10px] tracking-widest', UI_CONSTANTS.buttonRadius)}
+              className={cn(
+                'min-h-12 w-full touch-manipulation bg-indigo-600 font-bold uppercase text-[10px] tracking-widest sm:w-auto sm:min-w-[8rem]',
+                UI_CONSTANTS.buttonRadius,
+              )}
             >
               {t('statsApplyRange')}
             </Button>
@@ -356,10 +373,10 @@ export function Stats() {
                   : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900',
               )}
             >
-              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: PILLAR_COLORS[item.pillar] }}>
+              <p className="truncate text-[10px] font-black uppercase tracking-widest" style={{ color: PILLAR_COLORS[item.pillar] }}>
                 {item.name}
               </p>
-              <p className="mt-2 text-2xl font-black tabular-nums text-zinc-900 dark:text-white">{item.labelText}</p>
+              <p className="mt-2 text-xl font-black tabular-nums text-zinc-900 dark:text-white sm:text-2xl">{item.labelText}</p>
               <p className="mt-1 text-[10px] font-bold text-zinc-500">
                 {item.target > 0 ? t('statsVsObjective') : '—'}
                 {item.objectiveMet && (
@@ -373,36 +390,36 @@ export function Stats() {
 
       <section className="space-y-6">
         <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">{t('activityOverTime')}</h2>
-        <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-8 rounded-[2rem] shadow-2xl">
+        <Card className="rounded-[2rem] border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
           {isLoading ? (
             <Skeleton className="h-64 w-full" />
           ) : (
-            <div className="h-72 w-full min-h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 w-full min-h-[250px] min-w-0 sm:h-72 sm:min-h-[280px]">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <ComposedChart
                   data={timeSeriesData}
                   margin={{
-                    top: 16,
-                    right: 8,
-                    left: 4,
-                    bottom: period === 'day' ? 36 : 16,
+                    top: 20,
+                    right: 4,
+                    left: 0,
+                    bottom: period === 'day' ? 32 : 8,
                   }}
                 >
                   <XAxis
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#52525b', fontSize: period === 'day' ? 9 : 10, fontWeight: 700 }}
+                    tick={{ fill: '#52525b', fontSize: period === 'day' ? 8 : 9, fontWeight: 700 }}
                     className="dark:[&_.recharts-cartesian-axis-tick_text]:fill-zinc-400"
-                    interval={period === 'day' ? 1 : period === 'month' ? 4 : 0}
-                    minTickGap={period === 'day' ? 4 : 8}
+                    interval={period === 'day' ? 2 : period === 'month' ? 5 : 0}
+                    minTickGap={4}
                   />
                   <Tooltip
                     cursor={{ fill: 'rgba(99, 102, 241, 0.08)', radius: 8 }}
                     content={<TimeSeriesTooltip lang={lang} t={t} />}
                   />
                   <Legend
-                    wrapperStyle={{ fontSize: 10, fontWeight: 700 }}
+                    wrapperStyle={{ fontSize: 9, fontWeight: 700, paddingTop: 8 }}
                     formatter={(value) => PILLAR_LABELS[lang][value as Pillar] ?? value}
                   />
                   {PILLARS.map((pillar) => (
@@ -411,7 +428,7 @@ export function Stats() {
                       dataKey={pillar}
                       stackId="pillars"
                       fill={PILLAR_COLORS[pillar]}
-                      barSize={period === 'month' ? 8 : 28}
+                      barSize={activityBarSize}
                     />
                   ))}
                   <Line type="monotone" dataKey="total" stroke="#a1a1aa" strokeWidth={1} dot={false} legendType="none" />
@@ -444,13 +461,13 @@ export function Stats() {
               {deeds.length} Total
             </span>
           </div>
-          <Card className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl shadow-xl">
+          <Card className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : (
-              <div className="h-64 w-full min-h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={deedsByPillarData} layout="vertical" margin={{ left: 4, right: 36 }}>
+              <div className="h-64 w-full min-h-[250px] min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <BarChart data={deedsByPillarData} layout="vertical" margin={{ left: 0, right: 40 }}>
                     <XAxis type="number" hide />
                     <YAxis
                       dataKey="pillar"
@@ -528,13 +545,13 @@ export function Stats() {
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">{t('durationMinutes')}</h2>
             <span className="text-[10px] font-black text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-lg uppercase">Minutes</span>
           </div>
-          <Card className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl shadow-xl">
+          <Card className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : (
-              <div className="h-64 w-full min-h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={durationByPillarData} layout="vertical" margin={{ left: 4, right: 44 }}>
+              <div className="h-64 w-full min-h-[250px] min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <BarChart data={durationByPillarData} layout="vertical" margin={{ left: 0, right: 48 }}>
                     <XAxis type="number" hide />
                     <YAxis
                       dataKey="pillar"
@@ -642,7 +659,7 @@ export function Stats() {
             <Select value={filterPillar} onValueChange={(v: string | null) => v && setFilterPillar(v as Pillar | 'all')}>
               <SelectTrigger
                 className={cn(
-                  'h-10 w-36 bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs font-bold shadow-sm',
+                  'h-11 min-h-11 w-full max-w-[10rem] bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs font-bold shadow-sm',
                   UI_CONSTANTS.buttonRadius,
                 )}
               >

@@ -14,6 +14,7 @@ import { Logo } from '@/components/Logo';
 import { LayoutDashboard, BarChart3, FileText, MoreHorizontal, Plus, Loader2, Mic, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { MOBILE_SHELL } from '@/constants';
 import { useShellStore } from '@/stores/shell-store';
 import { FloatingQuestWidget } from './FloatingQuestWidget';
 
@@ -52,7 +53,7 @@ export function QuestShell() {
 
   return (
     <ErrorBoundary>
-      <div className="relative min-h-dvh w-full bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-white">
+      <div className="relative min-h-dvh w-full max-w-[100vw] overflow-x-hidden bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-white">
         {/* Desktop : sidebar fixe (pas de scroll ici) — seul le <main> défile */}
         <aside
           className={cn(
@@ -122,8 +123,13 @@ export function QuestShell() {
 
         {/* Colonne contenu : pleine largeur sur mobile, décalée sur md pour la sidebar fixe */}
         <div className="flex min-h-dvh flex-col bg-zinc-50/30 dark:bg-zinc-950 md:h-dvh md:min-h-0 md:pl-64">
-          <main className="min-h-0 flex-1 overflow-y-auto overscroll-y-auto pt-2 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch] md:pb-8">
-            <div className="mx-auto max-w-6xl px-4 md:px-8">
+          <main
+            className={cn(
+              'min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-auto pt-2 [-webkit-overflow-scrolling:touch]',
+              MOBILE_SHELL.mainPaddingBottom,
+            )}
+          >
+            <div className="mx-auto w-full max-w-6xl min-w-0 px-4 md:px-8">
               {activeTab === 'dashboard' && <Dashboard onTabChange={setActiveTab} />}
               {activeTab === 'activities' && <Activities onBack={() => setActiveTab('dashboard')} />}
               {activeTab === 'stats' && <Stats />}
@@ -133,27 +139,31 @@ export function QuestShell() {
           </main>
 
           <div
-            className="fixed right-4 z-40 flex flex-col gap-4 md:hidden"
-            style={{ bottom: 'calc(5.75rem + env(safe-area-inset-bottom, 0px))' }}
+            className={cn(
+              'fixed right-[max(1rem,env(safe-area-inset-right,0px))] z-40 flex flex-col gap-3 md:hidden',
+              MOBILE_SHELL.fabBottom,
+            )}
           >
             <button
               type="button"
               onClick={() => setAudioOpen(true)}
-              className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 shadow-2xl backdrop-blur-xl transition-all hover:bg-zinc-800 active:scale-90"
+              aria-label={t('audioAssistant')}
+              className="flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 shadow-2xl backdrop-blur-xl transition-all hover:bg-zinc-800 active:scale-95"
             >
               <Mic className="h-6 w-6 text-indigo-400" />
             </button>
             <button
               type="button"
               onClick={() => setAddModalOpen(true)}
-              className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-primary-kinetic shadow-2xl shadow-indigo-500/40 transition-all hover:bg-indigo-500 active:scale-90"
+              aria-label={t('logDeed')}
+              className="flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-primary-kinetic shadow-2xl shadow-indigo-500/40 transition-all hover:bg-indigo-500 active:scale-95"
             >
-              <Plus className="h-8 w-8 text-on-primary" />
+              <Plus className="h-7 w-7 text-on-primary" />
             </button>
           </div>
 
-          <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white/95 px-2 py-3 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95 md:hidden">
-            <div className="flex w-full items-center justify-between">
+          <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-2 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95 md:hidden">
+            <div className="mx-auto flex w-full max-w-lg items-stretch justify-between gap-0.5">
               {(
                 [
                   { id: 'dashboard' as const, label: t('dashboard'), icon: LayoutDashboard },
@@ -168,14 +178,14 @@ export function QuestShell() {
                   type="button"
                   onClick={() => setActiveTab(item.id)}
                   className={cn(
-                    'flex min-w-0 flex-1 flex-col items-center gap-1 transition-colors',
+                    'flex min-h-11 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1 transition-colors',
                     activeTab === item.id
                       ? 'text-indigo-600 dark:text-indigo-500'
                       : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300',
                   )}
                 >
-                  <item.icon className="h-5 w-5" />
-                  <span className="mt-0.5 w-full truncate text-center text-[7.5px] font-bold uppercase leading-none tracking-tight">
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  <span className="w-full truncate text-center text-[8px] font-bold uppercase leading-tight tracking-tight">
                     {item.label}
                   </span>
                 </button>

@@ -299,7 +299,7 @@ export function More() {
           variant="outline"
           onClick={logout}
           className={cn(
-            'h-10 border-zinc-200 px-4 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-red-500/10 hover:text-red-500 dark:border-zinc-800',
+            'min-h-11 border-zinc-200 px-4 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-red-500/10 hover:text-red-500 dark:border-zinc-800',
             UI_CONSTANTS.buttonRadius,
           )}
         >
@@ -325,7 +325,7 @@ export function More() {
             id={`settings-tab-${tab.id}`}
             onClick={() => setSettingsTab(tab.id)}
             className={cn(
-              'shrink-0 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors',
+              'min-h-11 shrink-0 touch-manipulation rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors',
               settingsTab === tab.id
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
                 : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700',
@@ -469,7 +469,7 @@ export function More() {
                     onClick={() => void commitPillarObjectives()}
                     disabled={isUpdating}
                     className={cn(
-                      'h-11 shrink-0 bg-indigo-600 px-6 text-[10px] font-black uppercase tracking-widest text-white hover:bg-indigo-500',
+                      'min-h-12 w-full shrink-0 touch-manipulation bg-indigo-600 px-6 text-[10px] font-black uppercase tracking-widest text-white hover:bg-indigo-500 sm:w-auto',
                       UI_CONSTANTS.buttonRadius,
                     )}
                   >
