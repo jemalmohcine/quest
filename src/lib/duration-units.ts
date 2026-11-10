@@ -118,12 +118,20 @@ export function deedDurationFieldsFromInput(
   };
 }
 
-const UNIT_PHRASE_KEYS: Record<DurationUnit, TranslationKey> = {
+const UNIT_PHRASE_KEYS_PLURAL: Record<DurationUnit, TranslationKey> = {
   seconds: 'durationPhraseSeconds',
   minutes: 'durationPhraseMinutes',
   hours: 'durationPhraseHours',
   days: 'durationPhraseDays',
   months: 'durationPhraseMonths',
+};
+
+const UNIT_PHRASE_KEYS_SINGULAR: Record<DurationUnit, TranslationKey> = {
+  seconds: 'durationPhraseSecond',
+  minutes: 'durationPhraseMinute',
+  hours: 'durationPhraseHour',
+  days: 'durationPhraseDay',
+  months: 'durationPhraseMonth',
 };
 
 export function formatDeedDurationPhrase(
@@ -135,5 +143,6 @@ export function formatDeedDurationPhrase(
   const unit = (deed.durationUnit as DurationUnit) || 'minutes';
   const safeUnit = DURATION_UNITS_DEED.includes(unit) ? unit : 'minutes';
   const value = secondsToValueInUnit(seconds, safeUnit);
-  return `${value} ${t(UNIT_PHRASE_KEYS[safeUnit])}`;
+  const unitKey = value === 1 ? UNIT_PHRASE_KEYS_SINGULAR[safeUnit] : UNIT_PHRASE_KEYS_PLURAL[safeUnit];
+  return `${value} ${t(unitKey)}`;
 }

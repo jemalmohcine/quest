@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { Gauge, Pause, Play, Square, Timer, X, Plus, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MOBILE_SHELL, UI_CONSTANTS } from '@/constants';
 import { allFeelingOptions } from '@/lib/feelings';
@@ -82,7 +83,7 @@ export function FloatingQuestWidget() {
 
   useEffect(() => {
     if (!toast) return;
-    const id = setTimeout(() => setToast(null), 4000);
+    const id = setTimeout(() => setToast(null), 5000);
     return () => clearTimeout(id);
   }, [toast]);
 
@@ -163,16 +164,20 @@ export function FloatingQuestWidget() {
   return (
     <div
       className={cn(
-        'fixed left-[max(1rem,env(safe-area-inset-left,0px))] z-[38] flex max-w-[calc(100vw-5.5rem)] flex-col items-start gap-2',
+        'fixed z-[38] flex min-w-0 flex-col items-stretch gap-2',
+        'left-[max(0.75rem,env(safe-area-inset-left,0px))]',
+        'w-[min(20rem,calc(100vw-3.5rem-env(safe-area-inset-left,0px)-env(safe-area-inset-right,0px)))]',
+        'max-w-[calc(100vw-3.5rem)]',
         MOBILE_SHELL.widgetBottom,
-        'md:left-auto md:right-4 md:bottom-6 md:max-w-none md:items-end',
+        'md:left-auto md:right-4 md:bottom-6 md:w-[20rem] md:max-w-none md:items-end',
       )}
+      data-timer-version="2"
     >
       {toast && (
         <div
           role="status"
           className={cn(
-            'flex w-[min(20rem,calc(100vw-5.5rem))] items-center gap-2 border border-emerald-500/30 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900 shadow-lg dark:bg-emerald-950/90 dark:text-emerald-100',
+            'box-border flex w-full min-w-0 items-center gap-2 border border-emerald-500/30 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900 shadow-lg dark:bg-emerald-950/90 dark:text-emerald-100',
             UI_CONSTANTS.cardRadius,
           )}
         >
@@ -184,7 +189,7 @@ export function FloatingQuestWidget() {
       {expanded && (
         <div
           className={cn(
-            'w-[min(20rem,calc(100vw-5.5rem))] max-h-[min(70dvh,calc(100dvh-12rem))] overflow-y-auto overscroll-y-contain border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900',
+            'box-border w-full min-w-0 max-h-[min(70dvh,calc(100dvh-12rem))] overflow-x-hidden overflow-y-auto overscroll-y-contain border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900',
             UI_CONSTANTS.cardRadius,
           )}
         >
@@ -231,42 +236,51 @@ export function FloatingQuestWidget() {
           </p>
 
           <div className="space-y-3">
-            <Input
-              value={actionName}
-              onChange={(e) => setActionName(e.target.value)}
-              placeholder={t('whatAccomplished')}
-              disabled={fieldsLocked}
-              className={cn('h-12 min-h-11 text-base font-bold sm:text-sm', UI_CONSTANTS.buttonRadius)}
-            />
-            <Select
-              value={pillar ?? 'soulset'}
-              onValueChange={(v) => v && setPillar(v as Pillar)}
-              disabled={fieldsLocked}
-            >
-              <SelectTrigger className={cn('h-12 min-h-11 font-bold', UI_CONSTANTS.buttonRadius)}>
-                <SelectValue placeholder={t('pillar')} />
-              </SelectTrigger>
-              <SelectContent>
-                {PILLARS.map((p) => (
-                  <SelectItem key={p} value={p} className="min-h-11">
-                    {PILLAR_LABELS[lang][p]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('actionName')}</Label>
+              <Input
+                value={actionName}
+                onChange={(e) => setActionName(e.target.value)}
+                placeholder={t('whatAccomplished')}
+                disabled={fieldsLocked}
+                className={cn('h-12 min-h-11 text-base font-bold sm:text-sm', UI_CONSTANTS.buttonRadius)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('pillar')}</Label>
+              <Select
+                value={pillar ?? 'soulset'}
+                onValueChange={(v) => v && setPillar(v as Pillar)}
+                disabled={fieldsLocked}
+              >
+                <SelectTrigger className={cn('h-12 min-h-11 w-full min-w-0 font-bold', UI_CONSTANTS.buttonRadius)}>
+                  <SelectValue placeholder={t('pillar')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {PILLARS.map((p) => (
+                    <SelectItem key={p} value={p} className="min-h-11">
+                      {PILLAR_LABELS[lang][p]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select value={feeling} onValueChange={(v) => v && setFeeling(v)} disabled={fieldsLocked}>
-              <SelectTrigger className={cn('h-12 min-h-11 font-bold capitalize', UI_CONSTANTS.buttonRadius)}>
-                <SelectValue placeholder={t('feeling')} />
-              </SelectTrigger>
-              <SelectContent className="max-h-48">
-                {feelingOptions.map((f) => (
-                  <SelectItem key={f} value={f} className="min-h-11 capitalize">
-                    {f}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('feeling')}</Label>
+              <Select value={feeling} onValueChange={(v) => v && setFeeling(v)} disabled={fieldsLocked}>
+                <SelectTrigger className={cn('h-12 min-h-11 w-full min-w-0 font-bold capitalize', UI_CONSTANTS.buttonRadius)}>
+                  <SelectValue placeholder={t('feeling')} />
+                </SelectTrigger>
+                <SelectContent className="max-h-48">
+                  {feelingOptions.map((f) => (
+                    <SelectItem key={f} value={f} className="min-h-11 capitalize">
+                      {f}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="flex flex-col gap-2">
               {!sessionActive ? (

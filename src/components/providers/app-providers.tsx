@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { QuestProvider } from '@/features/quest/QuestProvider';
+import { PwaServiceWorker } from '@/components/pwa-service-worker';
 import { useMotionPrefsStore } from '@/stores/motion-prefs-store';
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
@@ -13,5 +14,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener('change', apply);
   }, []);
 
-  return <QuestProvider>{children}</QuestProvider>;
+  return (
+    <QuestProvider>
+      <PwaServiceWorker />
+      {children}
+    </QuestProvider>
+  );
 }
