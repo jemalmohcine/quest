@@ -41,7 +41,12 @@ export interface Deed {
   user_id?: string;
   pillar: Pillar;
   actionName: string;
+  /** Legacy rounded minutes (kept in sync with durationSeconds). */
   duration?: number | null;
+  /** Canonical stored duration in seconds. */
+  durationSeconds?: number | null;
+  /** Unit the user chose when logging (for display and edit prefills). */
+  durationUnit?: DurationUnit | string | null;
   thought?: string | null;
   /** Préréglages + sentiments personnalisés du profil. */
   feeling: string;

@@ -17,7 +17,7 @@ import { enUS, fr } from 'date-fns/locale';
 import { DeedDateTimeComboField } from './DeedDateTimeFields';
 import { useDeedsRefreshStore } from '@/stores';
 import { DurationValueField } from './DurationValueField';
-import { parseDurationInput, formatMinutesForDisplay, type DurationUnit } from '@/lib/duration-units';
+import { deedDurationFieldsFromInput, deedDurationFormState, type DurationUnit } from '@/lib/duration-units';
 
 interface EditDeedDialogProps {
   deed: Deed | null;
@@ -37,12 +37,16 @@ export function EditDeedDialog({ deed, onClose }: EditDeedDialogProps) {
   const [dateStr, setDateStr] = useState('');
   const [timeStr, setTimeStr] = useState('');
   const [saving, setSaving] = useState(false);
+  const [durationError, setDurationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!deed) return;
     setActionName(deed.actionName);
     setPillar(deed.pillar);
-    setDuration(deed.duration != null ? formatMinutesForDisplay(deed.duration, durationUnit) : '');
+    const dur = deedDurationFormState(deed);
+    setDuration(dur.value);
+    setDurationUnit(dur.unit);
+    setDurationError(null);
     setFeeling(deed.feeling);
     setThought(deed.thought || '');
     setDateStr(deed.date);
@@ -54,6 +58,13 @@ export function EditDeedDialog({ deed, onClose }: EditDeedDialogProps) {
 
   const handleSave = async () => {
     if (!deed?.id || !actionName.trim()) return;
+    if (pillar !== 'heartset' && duration.trim()) {
+      const parsed = deedDurationFieldsFromInput(duration, durationUnit);
+      if (!parsed.ok) {
+        setDurationError(parsed.code === 'missing_unit' ? t('durationUnitRequired') : t('durationInvalid'));
+        return;
+      }
+    }
     setSaving(true);
     try {
       const meta = deedFieldsFromDateAndTime(dateStr, timeStr);
@@ -71,11 +82,19 @@ export function EditDeedDialog({ deed, onClose }: EditDeedDialogProps) {
       };
       if (pillar === 'heartset') {
         payload.duration = null;
+        payload.duration_seconds = null;
+        payload.duration_unit = null;
       } else if (duration.trim()) {
-        const du = parseDurationInput(duration, durationUnit);
-        payload.duration = du != null ? Math.max(0, du) : null;
+        const parsed = deedDurationFieldsFromInput(duration, durationUnit);
+        if (parsed.ok) {
+          payload.duration = parsed.fields.duration;
+          payload.duration_seconds = parsed.fields.duration_seconds;
+          payload.duration_unit = parsed.fields.duration_unit;
+        }
       } else {
         payload.duration = null;
+        payload.duration_seconds = null;
+        payload.duration_unit = null;
       }
 
       const { error } = await questHttp.updateDeed(deed.id, payload);
@@ -137,8 +156,15 @@ export function EditDeedDialog({ deed, onClose }: EditDeedDialogProps) {
                 <DurationValueField
                   value={duration}
                   unit={durationUnit}
-                  onValueChange={setDuration}
-                  onUnitChange={setDurationUnit}
+                  onValueChange={(v) => {
+                    setDuration(v);
+                    if (durationError) setDurationError(null);
+                  }}
+                  onUnitChange={(u) => {
+                    setDurationUnit(u);
+                    if (durationError) setDurationError(null);
+                  }}
+                  error={durationError}
                 />
               </div>
             ) : (

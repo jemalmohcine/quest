@@ -42,6 +42,7 @@ import {
   periodDeedTarget,
   periodDurationTargetMinutes,
 } from '@/lib/objectives';
+import { getDeedDurationMinutes } from '@/lib/duration-units';
 
 const WEEK_OPTS = { weekStartsOn: 1 as const };
 
@@ -178,7 +179,7 @@ export function Stats() {
 
   const durationPillars = PILLARS.filter((p) => p !== 'heartset');
   const durationByPillarData = durationPillars.map((pillar) => {
-    const duration = deeds.filter((d) => d.pillar === pillar).reduce((acc, d) => acc + (d.duration || 0), 0);
+    const duration = deeds.filter((d) => d.pillar === pillar).reduce((acc, d) => acc + getDeedDurationMinutes(d), 0);
     const target = periodDurationTargetMinutes(profile, pillar, dayCount);
     return {
       name: PILLAR_LABELS[lang][pillar],

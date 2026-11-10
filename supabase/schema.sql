@@ -23,6 +23,8 @@ create table if not exists public.deeds (
   pillar text not null,
   action_name text not null,
   duration integer,
+  duration_seconds integer,
+  duration_unit text,
   thought text,
   feeling text not null default 'neutral',
   date text not null,

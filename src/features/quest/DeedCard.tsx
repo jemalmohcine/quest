@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Trash2, Calendar, Clock, Quote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuest } from './QuestProvider';
+import { formatDeedDurationPhrase, getDeedDurationSeconds } from '@/lib/duration-units';
 
 interface DeedCardProps {
   deed: Deed;
@@ -97,11 +98,11 @@ export function DeedCard({ deed, onDelete, onEdit, className, showThought = true
             <Clock className="w-3 h-3" />
             {deed.time}
           </span>
-          {deed.duration && (
-            <span className="font-black" style={{ color: PILLAR_COLORS[deed.pillar] }}>
-              {deed.duration} MIN
+          {getDeedDurationSeconds(deed) > 0 ? (
+            <span className="font-black normal-case tracking-normal" style={{ color: PILLAR_COLORS[deed.pillar] }}>
+              {formatDeedDurationPhrase(deed, t)}
             </span>
-          )}
+          ) : null}
         </div>
 
         {showThought && deed.thought && (

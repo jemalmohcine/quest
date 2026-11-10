@@ -13,7 +13,7 @@ import { User, Globe, Target, Bell, Download, Trash2, LogOut, Info, Camera, Load
 import { useState, useEffect } from 'react';
 import { format, startOfMonth, startOfWeek } from 'date-fns';
 import { DurationValueField } from './DurationValueField';
-import type { DurationUnit } from '@/lib/duration-units';
+import { DURATION_UNITS_GOAL, formatDeedDurationPhrase, type DurationUnit } from '@/lib/duration-units';
 import { cn, sumPillarObjectives } from '@/lib/utils';
 import { normalizeFeelingKey } from '@/lib/feelings';
 import { applyDomTheme, persistTheme } from '@/lib/theme-preference';
@@ -202,7 +202,10 @@ export function More() {
         'data:text/csv;charset=utf-8,' +
         'Date,Time,Pillar,Action,Duration,Feeling,Thought\n' +
         deeds
-          .map((d) => `${d.date},${d.time},${d.pillar},"${d.actionName}",${d.duration || ''},${d.feeling},"${d.thought || ''}"`)
+          .map((d) => {
+            const durLabel = formatDeedDurationPhrase(d, t).replace(/"/g, '""');
+            return `${d.date},${d.time},${d.pillar},"${d.actionName}","${durLabel}",${d.feeling},"${d.thought || ''}"`;
+          })
           .join('\n');
 
       const encodedUri = encodeURI(csvContent);
@@ -507,6 +510,7 @@ export function More() {
                             unit={durationDraft[p].unit}
                             onValueChange={(v) => setDurationDraft((d) => ({ ...d, [p]: { ...d[p], value: v } }))}
                             onUnitChange={(u) => setDurationDraft((d) => ({ ...d, [p]: { ...d[p], unit: u } }))}
+                            units={DURATION_UNITS_GOAL}
                             disabled={isUpdating}
                           />
                         </div>

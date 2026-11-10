@@ -65,6 +65,8 @@ type DeedRow = {
   pillar: string;
   action_name: string;
   duration: number | null;
+  duration_seconds?: number | null;
+  duration_unit?: string | null;
   thought: string | null;
   feeling: string;
   date: string;
@@ -82,6 +84,8 @@ export function deedRowToDeed(row: DeedRow): Deed {
     pillar: row.pillar as Pillar,
     actionName: row.action_name,
     duration: row.duration,
+    durationSeconds: row.duration_seconds ?? null,
+    durationUnit: row.duration_unit ?? null,
     thought: row.thought,
     feeling: row.feeling ?? 'neutral',
     date: row.date,
