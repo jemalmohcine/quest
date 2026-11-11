@@ -1,8 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { format, getWeek, getYear } from 'date-fns';
-
-const WEEK_OPTS = { weekStartsOn: 1 as const };
+import { QUEST_WEEK_OPTS } from '@/lib/calendar-period';
 import { PILLARS, type Pillar } from '../types';
 
 export function cn(...inputs: ClassValue[]) {
@@ -34,7 +33,7 @@ export function createDeedMetadata() {
   const now = new Date();
   return {
     date: format(now, 'yyyy-MM-dd'),
-    week: getWeek(now, WEEK_OPTS),
+    week: getWeek(now, QUEST_WEEK_OPTS),
     month: format(now, 'yyyy-MM'),
     year: now.getFullYear(),
     time: format(now, 'HH:mm'),
@@ -48,7 +47,7 @@ export function deedFieldsFromDateAndTime(dateStr: string, timeStr: string) {
   const when = new Date(y, mo - 1, d, hh || 0, mm || 0, 0, 0);
   return {
     date: dateStr,
-    week: getWeek(when, WEEK_OPTS),
+    week: getWeek(when, QUEST_WEEK_OPTS),
     month: format(when, 'yyyy-MM'),
     year: getYear(when),
     time: `${String(hh || 0).padStart(2, '0')}:${String(mm || 0).padStart(2, '0')}`,

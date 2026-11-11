@@ -44,7 +44,7 @@ import {
 } from '@/lib/objectives';
 import { getDeedDurationMinutes } from '@/lib/duration-units';
 
-const WEEK_OPTS = { weekStartsOn: 1 as const };
+import { QUEST_WEEK_OPTS } from '@/lib/calendar-period';
 
 function localHourFromDeed(d: Deed): number | null {
   const raw = d.time?.trim() ?? '';
@@ -228,7 +228,7 @@ export function Stats() {
       return days.map((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const row: Record<string, string | number | boolean> = {
-          name: format(day, 'EEE', WEEK_OPTS),
+          name: format(day, 'EEE', QUEST_WEEK_OPTS),
           date: dateStr,
           ...emptyPillarCounts(),
         };

@@ -1,17 +1,6 @@
-import {
-  addDays,
-  addMonths,
-  differenceInCalendarDays,
-  endOfMonth,
-  format,
-  getWeek,
-  getYear,
-  parseISO,
-  startOfMonth,
-  startOfWeek,
-  subMonths,
-} from 'date-fns';
+import { addDays, addMonths, differenceInCalendarDays, endOfMonth, format, getWeek, getYear, parseISO, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 import type { Pillar } from '@/types';
+import { calendarWeekBoundsFromMondayYmd, QUEST_WEEK_OPTS } from '@/lib/calendar-period';
 
 export type ResumePeriodType = 'day' | 'week' | 'month';
 export type ResumeScope = 'global' | Pillar;
@@ -19,8 +8,6 @@ export type ResumeScope = 'global' | Pillar;
 export const RESUME_MIN_DEEDS_GLOBAL = 3;
 export const RESUME_MIN_DEEDS_PILLAR = 1;
 export const RESUME_DAY_EARLY_CLOSE_HOUR = 20;
-
-const WEEK_OPTS = { weekStartsOn: 1 as const } as const;
 
 export function ymdInTimeZone(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -43,7 +30,7 @@ export function hourInTimeZone(date: Date, timeZone: string): number {
 
 export function periodStartYmd(type: ResumePeriodType, anchor: Date): string {
   if (type === 'day') return format(anchor, 'yyyy-MM-dd');
-  if (type === 'week') return format(startOfWeek(anchor, WEEK_OPTS), 'yyyy-MM-dd');
+  if (type === 'week') return format(startOfWeek(anchor, QUEST_WEEK_OPTS), 'yyyy-MM-dd');
   return format(startOfMonth(anchor), 'yyyy-MM-dd');
 }
 
@@ -54,8 +41,8 @@ export function periodBoundsYmd(
   const start = parseISO(periodStart);
   if (type === 'day') return { from: periodStart, to: periodStart, dayCount: 1 };
   if (type === 'week') {
-    const end = addDays(start, 6);
-    return { from: periodStart, to: format(end, 'yyyy-MM-dd'), dayCount: 7 };
+    const b = calendarWeekBoundsFromMondayYmd(periodStart);
+    return { from: b.startYmd, to: b.endYmd, dayCount: b.dayCount };
   }
   const monthStart = startOfMonth(start);
   const monthEnd = endOfMonth(start);
@@ -92,11 +79,11 @@ export function shiftPeriodStart(type: ResumePeriodType, periodStart: string, de
 
 export function normalizePeriodStart(type: ResumePeriodType, ymd: string): string {
   if (type === 'month') return format(startOfMonth(parseISO(ymd)), 'yyyy-MM-dd');
-  if (type === 'week') return format(startOfWeek(parseISO(ymd), WEEK_OPTS), 'yyyy-MM-dd');
+  if (type === 'week') return format(startOfWeek(parseISO(ymd), QUEST_WEEK_OPTS), 'yyyy-MM-dd');
   return ymd;
 }
 
 export function legacyWeekIdFromMonday(mondayYmd: string): string {
   const d = parseISO(mondayYmd);
-  return `${getYear(d)}-W${getWeek(d, WEEK_OPTS)}`;
+  return `${getYear(d)}-W${getWeek(d, QUEST_WEEK_OPTS)}`;
 }
