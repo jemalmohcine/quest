@@ -5,6 +5,11 @@ import { questHttp } from '@/services/quest-http';
 import type { ProfileUpsertBody } from '@/lib/schemas/profile';
 import { profileRowToUserProfile, userProfileToUpsertRow } from '@/lib/quest-mappers';
 import { UserProfile } from '@/types';
+import {
+  DEFAULT_GOAL_PACK_ID,
+  goalPackToProfileSettings,
+  isLegacyDefaultGoals,
+} from '@/lib/goal-packs';
 import { translations, TranslationKey } from '@/lib/translations';
 import { applyDomTheme, persistTheme } from '@/lib/theme-preference';
 
@@ -25,21 +30,15 @@ interface QuestContextType {
 const QuestContext = createContext<QuestContextType | undefined>(undefined);
 
 function defaultProfile(_id: string, email: string, nameHint: string): UserProfile {
+  const pack = goalPackToProfileSettings(DEFAULT_GOAL_PACK_ID);
   return {
     email,
     name: nameHint || 'User',
     createdAt: new Date().toISOString(),
     language: 'en',
     theme: 'system',
-    dailyObjective: 5,
-    objectivePerPillar: {
-      soulset: 1,
-      healthset: 1,
-      mindset: 1,
-      skillset: 1,
-      heartset: 1,
-    },
     customFeelings: [],
+    ...pack,
   };
 }
 
@@ -87,7 +86,25 @@ export function QuestProvider({ children }: { children: React.ReactNode }) {
       setProfile(base);
       return;
     }
-    setProfile(profileRowToUserProfile(data as Parameters<typeof profileRowToUserProfile>[0]));
+    let nextProfile = profileRowToUserProfile(data as Parameters<typeof profileRowToUserProfile>[0]);
+    if (!nextProfile.goalPackId && isLegacyDefaultGoals(nextProfile)) {
+      const pack = goalPackToProfileSettings(DEFAULT_GOAL_PACK_ID);
+      nextProfile = { ...nextProfile, ...pack };
+      const row = userProfileToUpsertRow(u.id, u.email ?? '', nextProfile);
+      const { error: migErr } = await questHttp.putProfile({
+        name: row.name,
+        language: row.language === 'fr' ? 'fr' : 'en',
+        theme: row.theme === 'dark' || row.theme === 'light' || row.theme === 'system' ? row.theme : 'system',
+        daily_objective: row.daily_objective,
+        objective_per_pillar: row.objective_per_pillar as ProfileUpsertBody['objective_per_pillar'],
+        duration_objective_per_pillar: row.duration_objective_per_pillar as ProfileUpsertBody['duration_objective_per_pillar'],
+        custom_feelings: row.custom_feelings ?? [],
+        photo_url: row.photo_url ?? undefined,
+        goal_pack_id: (row.goal_pack_id ?? null) as ProfileUpsertBody['goal_pack_id'],
+      });
+      if (migErr) console.error('[quest] default goal pack migration', migErr);
+    }
+    setProfile(nextProfile);
   }, []);
 
   const refreshProfile = useCallback(async () => {

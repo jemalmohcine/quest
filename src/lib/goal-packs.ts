@@ -14,6 +14,8 @@ export const GOAL_PACK_RESEARCH_SOURCES = [
 
 export type GoalPackId = 'essential' | 'balanced' | 'momentum';
 
+export const DEFAULT_GOAL_PACK_ID: GoalPackId = 'balanced';
+
 export type GoalPackLocaleCopy = {
   name: string;
   tagline: string;
@@ -222,15 +224,33 @@ export function detectMatchingGoalPack(profile: UserProfile): GoalPackId | null 
   return null;
 }
 
-export function resolveDisplayedGoalPack(profile: UserProfile | null | undefined): GoalPackId | 'custom' | null {
-  if (!profile) return null;
-  if (profile.goalPackId && profileMatchesGoalPack(profile, profile.goalPackId)) {
-    return profile.goalPackId;
+/** True for pre-pack default profile (1 deed/pillar, no durations, total 5). */
+export function isLegacyDefaultGoals(
+  profile: Pick<UserProfile, 'objectivePerPillar' | 'durationObjectivePerPillar' | 'dailyObjective'>,
+): boolean {
+  if (profile.dailyObjective !== 5) return false;
+  for (const p of PILLARS) {
+    if ((profile.objectivePerPillar[p] ?? 0) !== 1) return false;
   }
-  const inferred = detectMatchingGoalPack(profile);
-  if (inferred) return inferred;
-  if (profile.goalPackId) return 'custom';
-  return 'custom';
+  const durations = profile.durationObjectivePerPillar;
+  if (!durations) return true;
+  for (const p of PILLARS) {
+    if (p === 'heartset') continue;
+    const d = durations[p];
+    if (d && d.value > 0) return false;
+  }
+  return true;
+}
+
+/** Selected pack for UI: only persisted goalPackId when it still matches objectives. */
+export function resolveDisplayedGoalPack(
+  profile: UserProfile | null | undefined,
+  opts?: { treatAsCustom?: boolean },
+): GoalPackId | 'custom' | null {
+  if (!profile || opts?.treatAsCustom) return 'custom';
+  const id = profile.goalPackId;
+  if (!id) return 'custom';
+  return profileMatchesGoalPack(profile, id) ? id : 'custom';
 }
 
 /** Weekly deed target (Mon–Sun) for display on pack cards. */
