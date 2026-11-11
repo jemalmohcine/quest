@@ -41,8 +41,9 @@ export function QuestShell() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-white">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400" />
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Quest</span>
       </div>
     );
   }
@@ -53,11 +54,11 @@ export function QuestShell() {
 
   return (
     <ErrorBoundary>
-      <div className="relative min-h-dvh w-full max-w-[100vw] overflow-x-hidden bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-white">
+      <div className="relative min-h-dvh w-full max-w-[100vw] overflow-x-hidden bg-zinc-50 text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-white">
         {/* Desktop : sidebar fixe (pas de scroll ici) — seul le <main> défile */}
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-20 hidden h-dvh w-64 flex-col overflow-hidden border-r border-zinc-200 bg-zinc-50/50 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/50',
+            'fixed inset-y-0 left-0 z-20 hidden h-dvh w-64 flex-col overflow-hidden border-r border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/95',
             'md:flex',
           )}
         >
@@ -92,7 +93,7 @@ export function QuestShell() {
                   'flex w-full items-center gap-3 rounded-xl px-4 py-2.5 transition-all duration-200',
                   activeTab === item.id
                     ? 'bg-indigo-600/10 font-bold text-indigo-600 dark:text-indigo-400'
-                    : 'text-zinc-500 hover:bg-zinc-200/50 hover:text-zinc-900 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-300',
+                    : 'font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200',
                 )}
               >
                 <item.icon className="h-5 w-5" />
@@ -122,14 +123,14 @@ export function QuestShell() {
         </aside>
 
         {/* Colonne contenu : pleine largeur sur mobile, décalée sur md pour la sidebar fixe */}
-        <div className="flex min-h-dvh flex-col bg-zinc-50/30 dark:bg-zinc-950 md:h-dvh md:min-h-0 md:pl-64">
+        <div className="flex min-h-dvh flex-col md:h-dvh md:min-h-0 md:pl-64">
           <main
             className={cn(
               'min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-auto pt-2 [-webkit-overflow-scrolling:touch]',
               MOBILE_SHELL.mainPaddingBottom,
             )}
           >
-            <div className="mx-auto w-full max-w-6xl min-w-0 px-4 md:px-8">
+            <div className="mx-auto w-full max-w-6xl min-w-0 px-3 md:px-8">
               {activeTab === 'dashboard' && <Dashboard onTabChange={setActiveTab} />}
               {activeTab === 'activities' && <Activities onBack={() => setActiveTab('dashboard')} />}
               {activeTab === 'stats' && <Stats />}
@@ -148,7 +149,7 @@ export function QuestShell() {
               type="button"
               onClick={() => setAudioOpen(true)}
               aria-label={t('audioAssistant')}
-              className="flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 shadow-2xl backdrop-blur-xl transition-all hover:bg-zinc-800 active:scale-95"
+              className="flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 shadow-lg backdrop-blur-xl transition-all hover:bg-zinc-800 active:scale-95"
             >
               <Mic className="h-6 w-6 text-indigo-400" />
             </button>
@@ -156,14 +157,14 @@ export function QuestShell() {
               type="button"
               onClick={() => setAddModalOpen(true)}
               aria-label={t('logDeed')}
-              className="flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-primary-kinetic shadow-2xl shadow-indigo-500/40 transition-all hover:bg-indigo-500 active:scale-95"
+              className="quest-interactive flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full border border-indigo-500/20 bg-indigo-600 shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500"
             >
-              <Plus className="h-7 w-7 text-on-primary" />
+              <Plus className="h-7 w-7 text-white" />
             </button>
           </div>
 
-          <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-2 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95 md:hidden">
-            <div className="mx-auto flex w-full max-w-lg items-stretch justify-between gap-0.5">
+          <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200/90 bg-white/96 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-1.5 shadow-[0_-4px_24px_rgb(0_0_0/0.04)] backdrop-blur-lg dark:border-zinc-800 dark:bg-zinc-950/96 dark:shadow-[0_-4px_24px_rgb(0_0_0/0.35)] md:hidden">
+            <div className="mx-auto flex w-full max-w-lg items-stretch justify-between gap-1">
               {(
                 [
                   { id: 'dashboard' as const, label: t('dashboard'), icon: LayoutDashboard },
@@ -180,12 +181,12 @@ export function QuestShell() {
                   className={cn(
                     'flex min-h-11 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1 transition-colors',
                     activeTab === item.id
-                      ? 'text-indigo-600 dark:text-indigo-500'
-                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300',
+                      ? 'bg-indigo-600/10 text-indigo-600 dark:text-indigo-400'
+                      : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/50',
                   )}
                 >
                   <item.icon className="h-5 w-5 shrink-0" />
-                  <span className="w-full truncate text-center text-[8px] font-bold uppercase leading-tight tracking-tight">
+                  <span className="line-clamp-2 w-full px-0.5 text-center text-[8px] font-bold uppercase leading-tight tracking-wide sm:text-[9px]">
                     {item.label}
                   </span>
                 </button>

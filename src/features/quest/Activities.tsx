@@ -75,7 +75,7 @@ export function Activities({ onBack }: { onBack: () => void }) {
   });
 
   return (
-    <div className="py-4 md:py-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="quest-page space-y-5">
       <SectionHeader title={t('allActivities')} subtitle={`${deeds.length} total deeds logged`}>
         <Button
           variant="secondary"
@@ -118,7 +118,7 @@ export function Activities({ onBack }: { onBack: () => void }) {
               sideOffset={8}
               align="center"
               className={cn(
-                'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-2xl overflow-hidden p-2',
+                'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-lg overflow-hidden p-2',
                 UI_CONSTANTS.cardRadius,
               )}
             >
@@ -152,7 +152,7 @@ export function Activities({ onBack }: { onBack: () => void }) {
             sideOffset={8}
             align="center"
             className={cn(
-              'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-2xl overflow-hidden p-2',
+              'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-lg overflow-hidden p-2',
               UI_CONSTANTS.cardRadius,
             )}
           >

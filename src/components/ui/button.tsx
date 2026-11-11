@@ -18,6 +18,10 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        quest:
+          "min-h-11 rounded-xl bg-indigo-600 px-4 text-xs font-extrabold uppercase tracking-wider text-white shadow-md shadow-indigo-500/20 hover:bg-indigo-500 active:scale-[0.98] dark:bg-indigo-600 dark:hover:bg-indigo-500",
+        "quest-ghost":
+          "min-h-11 rounded-xl border border-zinc-200 bg-zinc-50 font-bold text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800",
       },
       size: {
         default:

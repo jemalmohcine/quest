@@ -27,7 +27,7 @@ export function DeedCard({ deed, onDelete, onEdit, className, showThought = true
   return (
     <Card 
       className={cn(
-        "relative bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 transition-all duration-300 overflow-hidden",
+        'quest-card quest-interactive relative overflow-hidden bg-white dark:bg-zinc-900',
         onEdit && "cursor-pointer hover:border-indigo-400/50 dark:hover:border-indigo-500/40",
         UI_CONSTANTS.cardRadius,
         className

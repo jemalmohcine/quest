@@ -18,6 +18,7 @@ import { normalizeFeelingKey } from '@/lib/feelings';
 import { applyDomTheme, persistTheme } from '@/lib/theme-preference';
 import { UI_CONSTANTS } from '@/constants';
 import { SectionHeader } from './SectionHeader';
+import { questUi } from '@/lib/quest-ui';
 import { GoalPacksPanel } from './GoalPacksPanel';
 import { profileMatchesGoalPack } from '@/lib/goal-packs';
 import { durationToMinutes } from '@/lib/duration-units';
@@ -351,7 +352,7 @@ export function More() {
   ];
 
   return (
-    <div className="animate-in space-y-6 py-4 fade-in duration-500 md:space-y-8 md:py-8">
+    <div className="quest-page space-y-5">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <SectionHeader title={t('settings')} subtitle={t('preferences')} />
         <Button
@@ -367,28 +368,17 @@ export function More() {
         </Button>
       </header>
 
-      <div
-        role="tablist"
-        aria-label={t('settings')}
-        className={cn(
-          'flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-          '-mx-1 px-1',
-        )}
-      >
+      <div role="tablist" aria-label={t('settings')} className={cn(questUi.segment, 'quest-segment min-w-0 overflow-x-auto')}>
         {settingsTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             role="tab"
             aria-selected={settingsTab === tab.id}
+            data-active={settingsTab === tab.id}
             id={`settings-tab-${tab.id}`}
             onClick={() => setSettingsTab(tab.id)}
-            className={cn(
-              'min-h-11 shrink-0 touch-manipulation rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors',
-              settingsTab === tab.id
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700',
-            )}
+            className="min-h-11 shrink-0 touch-manipulation px-3"
           >
             {tab.label}
           </button>
@@ -399,13 +389,13 @@ export function More() {
         {settingsTab === 'profile' && (
           <section aria-labelledby="settings-tab-profile" className="space-y-4" role="tabpanel">
             <h3 className="sr-only">{t('profile')}</h3>
-            <Card className={cn('group overflow-hidden border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
+            <Card className={cn('group overflow-hidden border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
               <CardContent className="p-8">
                 <div className="flex flex-col items-center gap-10 md:flex-row">
                   <div className="relative">
                     <div
                       className={cn(
-                        'relative flex h-32 w-32 items-center justify-center overflow-hidden bg-indigo-600 shadow-2xl shadow-indigo-500/20 transition-transform group-hover:scale-105',
+                        'relative flex h-32 w-32 items-center justify-center overflow-hidden bg-indigo-600 shadow-lg shadow-indigo-500/20 transition-transform group-hover:scale-105',
                         UI_CONSTANTS.cardRadius,
                       )}
                     >
@@ -485,7 +475,7 @@ export function More() {
         {settingsTab === 'preferences' && (
           <section className="space-y-4" role="tabpanel">
             <h3 className="sr-only">{t('preferences')}</h3>
-            <Card className={cn('overflow-hidden border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
+            <Card className={cn('overflow-hidden border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
               <CardContent className="p-0">
                 {preferenceRows.map((item, i, arr) => (
                   <div key={item.id}>
@@ -509,7 +499,7 @@ export function More() {
         {settingsTab === 'goals' && (
           <section className="space-y-4" role="tabpanel">
             <h3 className="sr-only">{t('pillarObjectives')}</h3>
-            <Card className={cn('overflow-hidden border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
+            <Card className={cn('overflow-hidden border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
               <CardContent className="space-y-6 p-6 md:p-8">
                 <GoalPacksPanel
                   disabled={isUpdating}
@@ -698,7 +688,7 @@ export function More() {
         {settingsTab === 'data' && (
           <section className="space-y-6" role="tabpanel">
             <h3 className="sr-only">{t('dataManagement')}</h3>
-            <Card className={cn('overflow-hidden border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
+            <Card className={cn('overflow-hidden border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
               <CardContent className="space-y-6 p-8">
                 <div className="space-y-3">
                   <p className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Export Range</p>
@@ -723,7 +713,7 @@ export function More() {
                 <Button
                   onClick={() => void handleExport()}
                   className={cn(
-                    'h-16 w-full justify-start gap-5 bg-black px-8 text-[10px] font-black uppercase tracking-widest text-white shadow-2xl transition-all hover:-translate-y-1 active:scale-95 dark:bg-zinc-100 dark:text-black',
+                    'h-16 w-full justify-start gap-5 bg-black px-8 text-[10px] font-black uppercase tracking-widest text-white shadow-lg transition-all hover:-translate-y-1 active:scale-95 dark:bg-zinc-100 dark:text-black',
                     UI_CONSTANTS.buttonRadius,
                   )}
                 >
@@ -762,7 +752,7 @@ export function More() {
                       <Button
                         onClick={() => void handleDeleteAll()}
                         className={cn(
-                          'h-14 bg-red-600 text-[10px] font-black uppercase tracking-widest text-white shadow-xl shadow-red-500/20 hover:bg-red-500',
+                          'h-14 bg-red-600 text-[10px] font-black uppercase tracking-widest text-white shadow-sm shadow-red-500/20 hover:bg-red-500',
                           UI_CONSTANTS.buttonRadius,
                         )}
                       >

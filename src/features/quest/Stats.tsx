@@ -286,12 +286,12 @@ export function Stats() {
   const activityBarSize = period === 'month' ? 8 : period === 'week' || period === 'custom' ? 18 : 24;
 
   return (
-    <div className="max-w-full min-w-0 space-y-8 overflow-x-hidden py-4 md:py-8">
-      <header className="flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-black tracking-tighter mb-1">{t('stats')}</h1>
-            <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">{t('analyzeJourney')}</p>
+    <div className="quest-page max-w-full min-w-0 overflow-x-hidden space-y-5">
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div className="space-y-1">
+            <h1 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white md:text-2xl">{t('stats')}</h1>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">{t('analyzeJourney')}</p>
             <p className="mt-1 text-[10px] font-bold text-zinc-400 tabular-nums">
               {statsRange.startYmd} → {statsRange.endYmd}
             </p>
@@ -391,7 +391,7 @@ export function Stats() {
 
       <section className="space-y-6">
         <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">{t('activityOverTime')}</h2>
-        <Card className="rounded-[2rem] border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
+        <Card className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
           {isLoading ? (
             <Skeleton className="h-64 w-full" />
           ) : (
@@ -462,7 +462,7 @@ export function Stats() {
               {deeds.length} Total
             </span>
           </div>
-          <Card className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+          <Card className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : (
@@ -546,7 +546,7 @@ export function Stats() {
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">{t('durationMinutes')}</h2>
             <span className="text-[10px] font-black text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-lg uppercase">Minutes</span>
           </div>
-          <Card className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+          <Card className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : (
@@ -631,7 +631,7 @@ export function Stats() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <section className="space-y-6">
           <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">{t('feelings')}</h2>
-          <Card className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl shadow-xl h-full">
+          <Card className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl shadow-sm h-full">
             <div className="space-y-6">
               {sortedFeelings.length === 0 ? (
                 <div className="text-center py-12 text-zinc-600 text-sm italic">No data yet</div>
@@ -669,7 +669,7 @@ export function Stats() {
               </SelectTrigger>
               <SelectContent
                 className={cn(
-                  'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-2xl overflow-hidden',
+                  'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-lg overflow-hidden',
                   UI_CONSTANTS.cardRadius,
                 )}
               >

@@ -12,6 +12,10 @@ import {
 } from '@/lib/goal-packs';
 import { translations, TranslationKey } from '@/lib/translations';
 import { applyDomTheme, persistTheme } from '@/lib/theme-preference';
+import {
+  isQuestScreenshotFixtureMode,
+  SCREENSHOT_MOCK_PROFILE,
+} from '@/lib/quest-screenshot-fixtures';
 
 interface QuestContextType {
   user: SupabaseUser | null;
@@ -113,6 +117,20 @@ export function QuestProvider({ children }: { children: React.ReactNode }) {
   }, [user, loadOrCreateProfile]);
 
   useEffect(() => {
+    if (isQuestScreenshotFixtureMode()) {
+      setUser({
+        id: 'screenshot-fixture-user',
+        email: SCREENSHOT_MOCK_PROFILE.email,
+        app_metadata: {},
+        user_metadata: { name: SCREENSHOT_MOCK_PROFILE.name },
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+      } as SupabaseUser);
+      setProfile(SCREENSHOT_MOCK_PROFILE);
+      setLoading(false);
+      return;
+    }
+
     const supabase = getSupabaseClient();
     if (!supabase) {
       setUser(null);

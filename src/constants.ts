@@ -10,10 +10,10 @@ export const PILLAR_ICONS: Record<Pillar, any> = {
 };
 
 export const UI_CONSTANTS = {
-  cardRadius: 'rounded-[2rem]',
+  cardRadius: 'rounded-2xl',
   buttonRadius: 'rounded-xl',
   inputRadius: 'rounded-xl',
-  iconRadius: 'rounded-2xl',
+  iconRadius: 'rounded-xl',
 };
 
 /** Mobile shell: bottom nav + FAB column + progress widget (safe-area aware). */

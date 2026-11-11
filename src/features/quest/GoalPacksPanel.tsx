@@ -85,8 +85,8 @@ export function GoalPacksPanel({ disabled, goalsDirty, onApplied }: Props) {
             <Card
               key={pack.id}
               className={cn(
-                'border-zinc-200 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/60',
-                isActive && 'ring-2 ring-indigo-500/40',
+                'quest-card quest-interactive border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900',
+                isActive && 'ring-2 ring-indigo-500/35 shadow-sm shadow-indigo-500/10',
                 UI_CONSTANTS.cardRadius,
               )}
             >
