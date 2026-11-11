@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { User, Globe, Target, Bell, Download, Trash2, LogOut, Info, Camera, Loader2, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { format, startOfMonth, startOfWeek } from 'date-fns';
-import { DurationValueField } from './DurationValueField';
 import { DURATION_UNITS_GOAL, formatDeedDurationPhrase, type DurationUnit } from '@/lib/duration-units';
 import { cn, sumPillarObjectives } from '@/lib/utils';
 import { normalizeFeelingKey } from '@/lib/feelings';
@@ -20,7 +19,17 @@ import { applyDomTheme, persistTheme } from '@/lib/theme-preference';
 import { UI_CONSTANTS } from '@/constants';
 import { SectionHeader } from './SectionHeader';
 import { GoalPacksPanel } from './GoalPacksPanel';
-import { detectMatchingGoalPack } from '@/lib/goal-packs';
+import { profileMatchesGoalPack } from '@/lib/goal-packs';
+import { durationToMinutes } from '@/lib/duration-units';
+import type { TranslationKey } from '@/lib/translations';
+
+const GOAL_UNIT_LABEL: Record<DurationUnit, TranslationKey> = {
+  seconds: 'durationUnitSeconds',
+  minutes: 'durationUnitMinutes',
+  hours: 'durationUnitHours',
+  days: 'durationUnitDays',
+  months: 'durationUnitMonths',
+};
 
 type SettingsTab = 'profile' | 'preferences' | 'goals' | 'data';
 
@@ -42,6 +51,7 @@ export function More() {
     heartset: '1',
   });
   const [customFeelingInput, setCustomFeelingInput] = useState('');
+  const [goalsDirty, setGoalsDirty] = useState(false);
   const [durationDraft, setDurationDraft] = useState<Record<Pillar, { value: string; unit: DurationUnit }>>({
     soulset: { value: '', unit: 'minutes' },
     healthset: { value: '', unit: 'minutes' },
@@ -63,6 +73,7 @@ export function More() {
         skillset: String(o.skillset),
         heartset: String(o.heartset),
       });
+      setGoalsDirty(false);
       return;
     }
     const total = profile.dailyObjective ?? 5;
@@ -75,6 +86,7 @@ export function More() {
       skillset: String(base),
       heartset: String(base),
     });
+    setGoalsDirty(false);
   }, [profile?.objectivePerPillar, profile?.dailyObjective]);
 
   useEffect(() => {
@@ -89,8 +101,11 @@ export function More() {
       next[p] = obj ? { value: String(obj.value), unit: obj.unit } : { value: '', unit: 'minutes' };
     }
     setDurationDraft(next);
+    setGoalsDirty(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when profile objectives change
   }, [profile?.durationObjectivePerPillar]);
+
+  const markGoalsEdited = () => setGoalsDirty(true);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -161,12 +176,20 @@ export function More() {
       durationObjectivePerPillar,
     } as UserProfile;
 
+    const keepPackId =
+      !goalsDirty &&
+      profile.goalPackId &&
+      profileMatchesGoalPack(mergedForDetect, profile.goalPackId)
+        ? profile.goalPackId
+        : null;
+
     await patchProfile({
       objectivePerPillar: next,
       dailyObjective: total,
       durationObjectivePerPillar,
-      goalPackId: detectMatchingGoalPack(mergedForDetect),
+      goalPackId: keepPackId,
     });
+    setGoalsDirty(false);
   };
 
   const syncDraftFromProfile = () => {
@@ -189,6 +212,7 @@ export function More() {
       next[p] = obj ? { value: String(obj.value), unit: obj.unit } : { value: '', unit: 'minutes' };
     }
     setDurationDraft(next);
+    setGoalsDirty(false);
   };
 
   const addCustomFeeling = async () => {
@@ -487,17 +511,22 @@ export function More() {
             <h3 className="sr-only">{t('pillarObjectives')}</h3>
             <Card className={cn('overflow-hidden border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
               <CardContent className="space-y-6 p-6 md:p-8">
-                <GoalPacksPanel disabled={isUpdating} onApplied={syncDraftFromProfile} />
+                <GoalPacksPanel
+                  disabled={isUpdating}
+                  goalsDirty={goalsDirty}
+                  onApplied={syncDraftFromProfile}
+                />
 
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex min-w-0 items-start gap-4">
-                    <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center bg-zinc-50 dark:bg-zinc-800', UI_CONSTANTS.buttonRadius)}>
-                      <Target className="h-5 w-5 text-indigo-500" />
-                    </div>
-                    <div className="min-w-0 space-y-1">
-                      <p className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">{t('dailyObjective')}</p>
-                      <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-                        {t('totalDailyObjective')}: <span className="font-black text-indigo-600 dark:text-indigo-400">{draftObjectiveTotal}</span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Target className="h-5 w-5 shrink-0 text-indigo-500" aria-hidden />
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">
+                        {t('dailyObjective')}
+                      </p>
+                      <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                        {t('totalDailyObjective')}:{' '}
+                        <span className="font-black text-indigo-600 dark:text-indigo-400">{draftObjectiveTotal}</span>
                       </p>
                     </div>
                   </div>
@@ -506,7 +535,7 @@ export function More() {
                     onClick={() => void commitPillarObjectives()}
                     disabled={isUpdating}
                     className={cn(
-                      'min-h-12 w-full shrink-0 touch-manipulation bg-indigo-600 px-6 text-[10px] font-black uppercase tracking-widest text-white hover:bg-indigo-500 sm:w-auto',
+                      'min-h-11 w-full shrink-0 touch-manipulation bg-indigo-600 px-5 text-[10px] font-black uppercase tracking-widest text-white hover:bg-indigo-500 sm:w-auto',
                       UI_CONSTANTS.buttonRadius,
                     )}
                   >
@@ -514,45 +543,107 @@ export function More() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  {PILLARS.map((p) => (
-                    <div key={p} className="min-w-0 space-y-3 rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                      <label className="block truncate text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
-                        {PILLAR_LABELS[lang][p]}
-                      </label>
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{t('deedsObjective')}</span>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          min={0}
-                          max={99}
-                          value={pillarDraft[p]}
-                          onChange={(e) => setPillarDraft((d) => ({ ...d, [p]: e.target.value }))}
-                          className={cn(
-                            'h-12 border-none bg-zinc-100 text-sm font-black text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100',
-                            UI_CONSTANTS.inputRadius,
-                          )}
-                          disabled={isUpdating}
-                        />
-                      </div>
-                      {p !== 'heartset' ? (
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{t('durationObjectives')}</span>
-                          <DurationValueField
-                            value={durationDraft[p].value}
-                            unit={durationDraft[p].unit}
-                            onValueChange={(v) => setDurationDraft((d) => ({ ...d, [p]: { ...d[p], value: v } }))}
-                            onUnitChange={(u) => setDurationDraft((d) => ({ ...d, [p]: { ...d[p], unit: u } }))}
-                            units={DURATION_UNITS_GOAL}
-                            disabled={isUpdating}
-                          />
+                <div
+                  className={cn(
+                    'divide-y divide-zinc-200/80 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 dark:divide-zinc-700 dark:border-zinc-800 dark:bg-zinc-800/40',
+                  )}
+                >
+                  {PILLARS.map((p) => {
+                    const deedN = parseInt(pillarDraft[p], 10);
+                    const deedsNum = Number.isNaN(deedN) ? 0 : deedN;
+                    const durVal = parseFloat(durationDraft[p].value);
+                    const durMin =
+                      p !== 'heartset' && !Number.isNaN(durVal) && durVal > 0
+                        ? durationToMinutes(durVal, durationDraft[p].unit)
+                        : 0;
+                    const periodHint =
+                      lang === 'fr'
+                        ? `Sem. ${deedsNum * 7}${durMin ? ` · ${durMin * 7} min` : ''} · Mois ${deedsNum * 30}${durMin ? ` · ${durMin * 30} min` : ''}`
+                        : `Wk ${deedsNum * 7}${durMin ? ` · ${durMin * 7} min` : ''} · Mo ${deedsNum * 30}${durMin ? ` · ${durMin * 30} min` : ''}`;
+
+                    return (
+                      <div key={p} className="space-y-1 px-3 py-2.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="w-[5.5rem] shrink-0 truncate text-[10px] font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                            {PILLAR_LABELS[lang][p]}
+                          </span>
+                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                            <label className="sr-only" htmlFor={`deeds-${p}`}>
+                              {t('deedsObjective')} {PILLAR_LABELS[lang][p]}
+                            </label>
+                            <Input
+                              id={`deeds-${p}`}
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              max={99}
+                              value={pillarDraft[p]}
+                              onChange={(e) => {
+                                markGoalsEdited();
+                                setPillarDraft((d) => ({ ...d, [p]: e.target.value }));
+                              }}
+                              className={cn(
+                                'h-10 w-[3.25rem] border-none bg-zinc-100 px-2 text-center text-sm font-black tabular-nums dark:bg-zinc-900',
+                                UI_CONSTANTS.inputRadius,
+                              )}
+                              disabled={isUpdating}
+                            />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">
+                              {lang === 'fr' ? 'actes/j' : 'deeds/d'}
+                            </span>
+                            {p !== 'heartset' ? (
+                              <>
+                                <Input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={0}
+                                  value={durationDraft[p].value}
+                                  onChange={(e) => {
+                                    markGoalsEdited();
+                                    setDurationDraft((d) => ({ ...d, [p]: { ...d[p], value: e.target.value } }));
+                                  }}
+                                  className={cn(
+                                    'h-10 w-[3.5rem] border-none bg-zinc-100 px-2 text-center text-sm font-black tabular-nums dark:bg-zinc-900',
+                                    UI_CONSTANTS.inputRadius,
+                                  )}
+                                  disabled={isUpdating}
+                                  aria-label={`${t('durationObjectives')} ${PILLAR_LABELS[lang][p]}`}
+                                />
+                                <Select
+                                  value={durationDraft[p].unit}
+                                  onValueChange={(v) => {
+                                    if (!v) return;
+                                    markGoalsEdited();
+                                    setDurationDraft((d) => ({ ...d, [p]: { ...d[p], unit: v as DurationUnit } }));
+                                  }}
+                                  disabled={isUpdating}
+                                >
+                                  <SelectTrigger
+                                    className={cn(
+                                      'h-10 w-[4.5rem] border-none bg-zinc-100 text-[9px] font-black uppercase dark:bg-zinc-900',
+                                      UI_CONSTANTS.buttonRadius,
+                                    )}
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-white dark:bg-zinc-900">
+                                    {DURATION_UNITS_GOAL.map((u) => (
+                                      <SelectItem key={u} value={u} className="text-xs font-bold">
+                                        {t(GOAL_UNIT_LABEL[u])}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            ) : (
+                              <span className="text-[10px] text-zinc-500">{t('heartsetNoDuration')}</span>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <p className="text-[10px] font-medium text-zinc-500">{t('heartsetNoDuration')}</p>
-                      )}
-                    </div>
-                  ))}
+                        <p className="pl-[5.5rem] text-[9px] tabular-nums text-zinc-400">{periodHint}</p>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="space-y-4 border-t border-zinc-100 pt-6 dark:border-zinc-800">

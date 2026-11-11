@@ -3,7 +3,9 @@ import {
   getGoalPack,
   goalPackToProfileSettings,
   GOAL_PACK_IDS,
+  isLegacyDefaultGoals,
   profileMatchesGoalPack,
+  resolveDisplayedGoalPack,
   weeklyDurationMinutes,
   weeklyDeedTarget,
 } from './goal-packs';
@@ -38,5 +40,27 @@ assert(detectMatchingGoalPack(fake) === 'essential', 'detect essential');
 
 fake.objectivePerPillar.mindset = 2;
 assert(detectMatchingGoalPack(fake) === null, 'detect custom after edit');
+
+assert(resolveDisplayedGoalPack(fake) === 'custom', 'no highlight when pack id mismatches goals');
+assert(
+  resolveDisplayedGoalPack({ ...fake, goalPackId: 'essential' }) === 'custom',
+  'drifted goals show custom',
+);
+assert(
+  resolveDisplayedGoalPack(goalPackToProfileSettings('balanced') as UserProfile) === 'balanced',
+  'balanced pack id shown when set',
+);
+assert(
+  resolveDisplayedGoalPack(goalPackToProfileSettings('balanced') as UserProfile, { treatAsCustom: true }) ===
+    'custom',
+  'dirty goals force custom',
+);
+
+const legacy = {
+  dailyObjective: 5,
+  objectivePerPillar: { soulset: 1, healthset: 1, mindset: 1, skillset: 1, heartset: 1 },
+  durationObjectivePerPillar: {},
+} as UserProfile;
+assert(isLegacyDefaultGoals(legacy), 'legacy default detected');
 
 console.log('goal-packs.test.ts: ok');
