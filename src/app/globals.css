@@ -176,3 +176,55 @@
     linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 50px 50px;
 }
+
+@layer components {
+  .quest-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ds-space-5);
+    padding-top: var(--ds-space-2);
+    padding-bottom: var(--ds-space-4);
+    animation: quest-fade-in var(--ds-motion-in) var(--ds-ease-out);
+  }
+
+  .quest-card {
+    border-radius: var(--ds-radius-card);
+    border: 1px solid var(--ds-border);
+    background: var(--ds-surface);
+    box-shadow: var(--ds-shadow-card);
+  }
+
+  .quest-empty {
+    border-radius: var(--ds-radius-card);
+    border: 1px dashed rgb(161 161 170 / 0.45);
+    background: var(--ds-surface-muted);
+    padding: var(--ds-space-6) var(--ds-space-4);
+    text-align: center;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ds-text-muted);
+  }
+
+  .quest-interactive {
+    transition:
+      background-color var(--ds-motion-out) var(--ds-ease-out),
+      border-color var(--ds-motion-out) var(--ds-ease-out),
+      transform var(--ds-motion-out) var(--ds-ease-out),
+      box-shadow var(--ds-motion-out) var(--ds-ease-out);
+  }
+
+  .quest-interactive:active {
+    transform: scale(0.98);
+  }
+}
+
+@keyframes quest-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

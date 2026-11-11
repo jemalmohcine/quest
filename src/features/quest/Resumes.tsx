@@ -217,7 +217,7 @@ export function Resumes() {
   return (
     <div
       className={cn(
-        'py-4 md:py-8 space-y-6 animate-in fade-in duration-500',
+        'quest-page space-y-5',
         uiLocked && 'pointer-events-none opacity-90',
       )}
       aria-busy={isGenerating}

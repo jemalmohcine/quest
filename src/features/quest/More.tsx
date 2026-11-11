@@ -351,7 +351,7 @@ export function More() {
   ];
 
   return (
-    <div className="animate-in space-y-6 py-4 fade-in duration-500 md:space-y-8 md:py-8">
+    <div className="quest-page space-y-5">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <SectionHeader title={t('settings')} subtitle={t('preferences')} />
         <Button

@@ -101,7 +101,7 @@ export function AuthForms({ onBack }: { onBack: () => void }) {
             {t('backHome')}
           </Button>
 
-          <Card className="glass-panel border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden backdrop-blur-3xl">
+          <Card className="quest-card glass-panel overflow-hidden rounded-2xl border-white/10 shadow-sm backdrop-blur-3xl">
             <CardHeader className="space-y-2 pb-8 text-center">
               <div className="mx-auto w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 mb-4">
                 <Mail className="w-6 h-6 text-white" />

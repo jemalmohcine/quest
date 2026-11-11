@@ -14,6 +14,7 @@ import { cn, dailyProgressBreakdown, pillarDailyTarget } from '@/lib/utils';
 import { DeedCard } from './DeedCard';
 import { EditDeedDialog } from './EditDeedDialog';
 import { SectionHeader } from './SectionHeader';
+import { questUi } from '@/lib/quest-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeedsRefreshStore } from '@/stores';
 
@@ -86,7 +87,7 @@ export function Dashboard({
   };
 
   return (
-    <div className="py-4 md:py-8 space-y-8">
+    <div className={cn(questUi.page, 'space-y-5 md:space-y-6')}>
       <header className="flex items-center justify-between">
         <div className="group cursor-pointer" onClick={() => onTabChange?.('dashboard')}>
           <h1 className="text-4xl font-extrabold tracking-tighter mb-1 group-hover:text-indigo-600 transition-colors uppercase italic">Quest</h1>

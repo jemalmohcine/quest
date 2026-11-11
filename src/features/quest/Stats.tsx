@@ -286,12 +286,12 @@ export function Stats() {
   const activityBarSize = period === 'month' ? 8 : period === 'week' || period === 'custom' ? 18 : 24;
 
   return (
-    <div className="max-w-full min-w-0 space-y-8 overflow-x-hidden py-4 md:py-8">
-      <header className="flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-black tracking-tighter mb-1">{t('stats')}</h1>
-            <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">{t('analyzeJourney')}</p>
+    <div className="quest-page max-w-full min-w-0 overflow-x-hidden space-y-5">
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div className="space-y-1">
+            <h1 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white md:text-2xl">{t('stats')}</h1>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">{t('analyzeJourney')}</p>
             <p className="mt-1 text-[10px] font-bold text-zinc-400 tabular-nums">
               {statsRange.startYmd} → {statsRange.endYmd}
             </p>

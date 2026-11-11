@@ -9,15 +9,13 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ title, subtitle, className, children }: SectionHeaderProps) {
   return (
-    <div className={cn("flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6", className)}>
-      <div>
-        <h2 className="text-2xl font-black tracking-tighter text-zinc-900 dark:text-white leading-none">
+    <div className={cn('mb-1 flex flex-col justify-between gap-3 md:flex-row md:items-end', className)}>
+      <div className="min-w-0 space-y-1">
+        <h2 className="text-xl font-black leading-tight tracking-tight text-zinc-900 dark:text-white md:text-2xl">
           {title}
         </h2>
         {subtitle && (
-          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">
-            {subtitle}
-          </p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">{subtitle}</p>
         )}
       </div>
       {children && (
