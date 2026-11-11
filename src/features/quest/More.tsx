@@ -486,7 +486,7 @@ export function More() {
           <section className="space-y-4" role="tabpanel">
             <h3 className="sr-only">{t('pillarObjectives')}</h3>
             <Card className={cn('overflow-hidden border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
-              <CardContent className="space-y-8 p-6 md:p-8">
+              <CardContent className="space-y-6 p-6 md:p-8">
                 <GoalPacksPanel disabled={isUpdating} onApplied={syncDraftFromProfile} />
 
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
