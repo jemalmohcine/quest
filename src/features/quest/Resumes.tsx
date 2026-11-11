@@ -443,7 +443,7 @@ export function Resumes() {
             </CardContent>
           </Card>
         ) : narrative ? (
-          <Card className={cn('bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-xl', UI_CONSTANTS.cardRadius)}>
+          <Card className={cn('bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm', UI_CONSTANTS.cardRadius)}>
             <CardContent className="p-6 md:p-10 space-y-6">
               <div className="prose dark:prose-invert max-w-none text-zinc-800 dark:text-zinc-200 leading-relaxed">
                 <ReactMarkdown>{narrative}</ReactMarkdown>

@@ -250,7 +250,7 @@ export function FloatingQuestWidget() {
         <div
           aria-busy={savePending}
           className={cn(
-            'relative box-border w-full min-w-0 max-h-[min(70dvh,calc(100dvh-12rem))] overflow-x-hidden overflow-y-auto overscroll-y-contain border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900',
+            'relative box-border w-full min-w-0 max-h-[min(70dvh,calc(100dvh-12rem))] overflow-x-hidden overflow-y-auto overscroll-y-contain border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-900',
             UI_CONSTANTS.cardRadius,
             savePending && 'pointer-events-none',
           )}
@@ -452,7 +452,7 @@ export function FloatingQuestWidget() {
         }}
         disabled={savePending}
         className={cn(
-          'flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation flex-col items-center justify-center rounded-full border border-indigo-500/30 bg-white shadow-xl shadow-indigo-500/20 transition active:scale-95 disabled:opacity-60 dark:bg-zinc-900',
+          'flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation flex-col items-center justify-center rounded-full border border-indigo-500/30 bg-white shadow-sm shadow-indigo-500/20 transition active:scale-95 disabled:opacity-60 dark:bg-zinc-900',
           sessionActive && !paused && 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950',
           paused && 'ring-2 ring-amber-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950',
         )}

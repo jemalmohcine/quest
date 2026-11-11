@@ -373,7 +373,7 @@ export function AudioAssistant({ isOpen, onClose }: AudioAssistantProps) {
                 <Button
                   onClick={isRecording ? stopRecording : startRecording}
                   className={cn(
-                    "w-24 h-24 rounded-full shadow-2xl transition-all active:scale-90 relative z-10",
+                    "w-24 h-24 rounded-full shadow-lg transition-all active:scale-90 relative z-10",
                     isRecording
                       ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
                       : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20'

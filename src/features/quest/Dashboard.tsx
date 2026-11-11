@@ -88,32 +88,36 @@ export function Dashboard({
 
   return (
     <div className={cn(questUi.page, 'space-y-5 md:space-y-6')}>
-      <header className="flex items-center justify-between">
-        <div className="group cursor-pointer" onClick={() => onTabChange?.('dashboard')}>
-          <h1 className="text-4xl font-extrabold tracking-tighter mb-1 group-hover:text-indigo-600 transition-colors uppercase italic">Quest</h1>
-          <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.2em]">
-            {t('welcome')}, <span className="text-zinc-900 dark:text-white">{profile?.name || 'Guest'}</span>
-          </p>
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <p className={questUi.kicker}>{t('dashboard')}</p>
+          <h1 className={questUi.title}>
+            {t('welcome')},{' '}
+            <span className="text-indigo-600 dark:text-indigo-400">{profile?.name || 'Guest'}</span>
+          </h1>
+          <p className={questUi.subtitle}>{t('dailyProgress')}</p>
         </div>
-        <div
+        <button
+          type="button"
           className={cn(
-            'w-12 h-12 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shadow-xl cursor-pointer hover:border-indigo-500/50 transition-all active:scale-95 group overflow-hidden',
+            'quest-interactive flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900',
             UI_CONSTANTS.iconRadius,
           )}
           onClick={() => onTabChange?.('more')}
+          aria-label={t('settings')}
         >
           {profile?.photoURL ? (
-            <img src={profile.photoURL} alt={profile.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            <img src={profile.photoURL} alt={profile.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
           ) : (
-            <UserIcon className="w-6 h-6 text-zinc-400 group-hover:text-indigo-500 transition-colors" />
+            <UserIcon className="h-5 w-5 text-zinc-400" />
           )}
-        </div>
+        </button>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card
           className={cn(
-            'lg:col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-800 border-none shadow-2xl shadow-indigo-500/20 overflow-hidden relative group',
+            'lg:col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-800 border-none shadow-lg shadow-indigo-500/20 overflow-hidden relative group',
             UI_CONSTANTS.cardRadius,
           )}
         >
@@ -221,7 +225,7 @@ export function Dashboard({
           )}
         </Card>
 
-        <Card className={cn('bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-xl', UI_CONSTANTS.cardRadius)}>
+        <Card className={cn('bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm', UI_CONSTANTS.cardRadius)}>
           <CardHeader>
             <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t('pillarDistribution')}</CardTitle>
           </CardHeader>

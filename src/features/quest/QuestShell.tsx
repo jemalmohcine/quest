@@ -149,7 +149,7 @@ export function QuestShell() {
               type="button"
               onClick={() => setAudioOpen(true)}
               aria-label={t('audioAssistant')}
-              className="flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 shadow-2xl backdrop-blur-xl transition-all hover:bg-zinc-800 active:scale-95"
+              className="flex h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 shadow-lg backdrop-blur-xl transition-all hover:bg-zinc-800 active:scale-95"
             >
               <Mic className="h-6 w-6 text-indigo-400" />
             </button>

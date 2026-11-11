@@ -194,7 +194,7 @@ export function DeedDateTimeComboField({
             ref={popupRef}
             onWheel={(e) => e.stopPropagation()}
             className={cn(
-              'fixed z-[9999] flex max-h-[min(92vh,560px)] w-[min(100vw-1rem,340px)] flex-col overflow-hidden overflow-y-auto rounded-2xl border border-zinc-200 bg-white text-zinc-900 shadow-xl ring-1 ring-zinc-950/5 [color-scheme:light] dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-50 dark:ring-white/10 dark:[color-scheme:dark]',
+              'fixed z-[9999] flex max-h-[min(92vh,560px)] w-[min(100vw-1rem,340px)] flex-col overflow-hidden overflow-y-auto rounded-2xl border border-zinc-200 bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-950/5 [color-scheme:light] dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-50 dark:ring-white/10 dark:[color-scheme:dark]',
               UI_CONSTANTS.cardRadius
             )}
             style={{ top: pos.top, left: pos.left }}

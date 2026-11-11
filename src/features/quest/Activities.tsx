@@ -118,7 +118,7 @@ export function Activities({ onBack }: { onBack: () => void }) {
               sideOffset={8}
               align="center"
               className={cn(
-                'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-2xl overflow-hidden p-2',
+                'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-lg overflow-hidden p-2',
                 UI_CONSTANTS.cardRadius,
               )}
             >
@@ -152,7 +152,7 @@ export function Activities({ onBack }: { onBack: () => void }) {
             sideOffset={8}
             align="center"
             className={cn(
-              'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-2xl overflow-hidden p-2',
+              'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-lg overflow-hidden p-2',
               UI_CONSTANTS.cardRadius,
             )}
           >

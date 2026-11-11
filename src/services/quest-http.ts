@@ -2,6 +2,12 @@ import { clientApiUrl } from '@/lib/client-api-url';
 import type { DeedCreateInput } from '@/lib/schemas/deed';
 import type { ProfileUpsertBody } from '@/lib/schemas/profile';
 import type { WeeklyResumePutBody } from '@/lib/schemas/weekly-resume';
+import {
+  filterScreenshotDeeds,
+  isQuestScreenshotFixtureMode,
+  screenshotProfileApiRow,
+  SCREENSHOT_MOCK_RESUME_MARKDOWN,
+} from '@/lib/quest-screenshot-fixtures';
 
 export type QuestHttpError = { message: string };
 
@@ -26,6 +32,9 @@ function errMessage(json: Json, fallback: string): string {
 /** Client API `/api/v1/*` — session Supabase via cookies (même origine). */
 export const questHttp = {
   async getProfile(): Promise<{ data: unknown; error: QuestHttpError | null }> {
+    if (isQuestScreenshotFixtureMode()) {
+      return { data: screenshotProfileApiRow(), error: null };
+    }
     const res = await fetch(clientApiUrl('/api/v1/profile'), { credentials: 'same-origin' });
     const json = await parseJson(res);
     if (!res.ok) return { data: null, error: { message: errMessage(json, res.statusText) } };
@@ -33,6 +42,7 @@ export const questHttp = {
   },
 
   async putProfile(body: ProfileUpsertBody): Promise<{ error: QuestHttpError | null }> {
+    if (isQuestScreenshotFixtureMode()) return { error: null };
     const res = await fetch(clientApiUrl('/api/v1/profile'), {
       method: 'PUT',
       credentials: 'same-origin',
@@ -52,6 +62,9 @@ export const questHttp = {
     recent?: number;
     limit?: number;
   }): Promise<{ data: unknown[]; error: QuestHttpError | null }> {
+    if (isQuestScreenshotFixtureMode()) {
+      return { data: filterScreenshotDeeds(params), error: null };
+    }
     const sp = new URLSearchParams();
     if (params?.date) sp.set('date', params.date);
     if (params?.since) sp.set('since', params.since);
@@ -68,6 +81,7 @@ export const questHttp = {
   },
 
   async createDeed(body: DeedCreateInput): Promise<{ error: QuestHttpError | null }> {
+    if (isQuestScreenshotFixtureMode()) return { error: null };
     const res = await fetch(clientApiUrl('/api/v1/deeds'), {
       method: 'POST',
       credentials: 'same-origin',
@@ -125,6 +139,17 @@ export const questHttp = {
     period_start: string;
     scope: string;
   }): Promise<{ data: unknown; error: QuestHttpError | null }> {
+    if (isQuestScreenshotFixtureMode()) {
+      return {
+        data: {
+          narrative: SCREENSHOT_MOCK_RESUME_MARKDOWN,
+          period_type: params.period_type,
+          period_start: params.period_start,
+          scope: params.scope,
+        },
+        error: null,
+      };
+    }
     const sp = new URLSearchParams(params);
     const res = await fetch(clientApiUrl(`/api/v1/resumes?${sp}`), { credentials: 'same-origin' });
     const json = await parseJson(res);
@@ -138,6 +163,17 @@ export const questHttp = {
     scope: string;
     timeZone: string;
   }): Promise<{ data: unknown; error: QuestHttpError | null }> {
+    if (isQuestScreenshotFixtureMode()) {
+      return {
+        data: {
+          narrative: SCREENSHOT_MOCK_RESUME_MARKDOWN,
+          period_type: body.period_type,
+          period_start: body.period_start,
+          scope: body.scope,
+        },
+        error: null,
+      };
+    }
     const res = await fetch(clientApiUrl('/api/v1/resumes/generate'), {
       method: 'POST',
       credentials: 'same-origin',

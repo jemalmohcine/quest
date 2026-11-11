@@ -391,7 +391,7 @@ export function Stats() {
 
       <section className="space-y-6">
         <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">{t('activityOverTime')}</h2>
-        <Card className="rounded-[2rem] border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
+        <Card className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
           {isLoading ? (
             <Skeleton className="h-64 w-full" />
           ) : (
@@ -462,7 +462,7 @@ export function Stats() {
               {deeds.length} Total
             </span>
           </div>
-          <Card className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+          <Card className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : (
@@ -546,7 +546,7 @@ export function Stats() {
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">{t('durationMinutes')}</h2>
             <span className="text-[10px] font-black text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-lg uppercase">Minutes</span>
           </div>
-          <Card className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+          <Card className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : (
@@ -631,7 +631,7 @@ export function Stats() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <section className="space-y-6">
           <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">{t('feelings')}</h2>
-          <Card className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl shadow-xl h-full">
+          <Card className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl shadow-sm h-full">
             <div className="space-y-6">
               {sortedFeelings.length === 0 ? (
                 <div className="text-center py-12 text-zinc-600 text-sm italic">No data yet</div>
@@ -669,7 +669,7 @@ export function Stats() {
               </SelectTrigger>
               <SelectContent
                 className={cn(
-                  'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-2xl overflow-hidden',
+                  'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-lg overflow-hidden',
                   UI_CONSTANTS.cardRadius,
                 )}
               >
