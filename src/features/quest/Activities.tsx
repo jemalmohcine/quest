@@ -16,7 +16,8 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeedsRefreshStore } from '@/stores';
 
-import { isToday, isThisWeek, isThisMonth } from 'date-fns';
+import { isToday } from 'date-fns';
+import { deedYmdInMonthContaining, deedYmdInWeekContaining } from '@/lib/calendar-period';
 
 export function Activities({ onBack }: { onBack: () => void }) {
   const { user, profile, t } = useQuest();
@@ -65,11 +66,12 @@ export function Activities({ onBack }: { onBack: () => void }) {
       deed.actionName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (deed.thought?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
 
-    const deedDate = deed.createdAt ? new Date(deed.createdAt) : new Date(deed.date);
     let matchesTime = true;
-    if (timeRange === 'today') matchesTime = isToday(deedDate);
-    else if (timeRange === 'week') matchesTime = isThisWeek(deedDate);
-    else if (timeRange === 'month') matchesTime = isThisMonth(deedDate);
+    if (timeRange === 'today') {
+      const deedDate = deed.createdAt ? new Date(deed.createdAt) : new Date(deed.date + 'T12:00:00');
+      matchesTime = isToday(deedDate);
+    } else if (timeRange === 'week') matchesTime = deedYmdInWeekContaining(deed.date);
+    else if (timeRange === 'month') matchesTime = deedYmdInMonthContaining(deed.date);
 
     return matchesPillar && matchesSearch && matchesTime;
   });

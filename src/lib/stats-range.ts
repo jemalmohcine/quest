@@ -1,34 +1,42 @@
-import {
-  format,
-  startOfDay,
-  startOfWeek,
-  startOfMonth,
-  startOfYear,
-  endOfDay,
-  subDays,
-} from 'date-fns';
+import { endOfDay, format, startOfDay, subDays } from 'date-fns';
 import type { StatsRange } from '@/lib/objectives';
+import {
+  calendarMonthBounds,
+  calendarWeekBounds,
+  calendarYearBounds,
+  type CalendarBounds,
+} from '@/lib/calendar-period';
 
 export type StatsPeriod = 'day' | 'week' | 'month' | 'year' | 'custom';
 
-const WEEK_OPTS = { weekStartsOn: 1 as const };
+function toStatsRange(b: CalendarBounds): StatsRange {
+  return {
+    start: b.start,
+    end: b.end,
+    startYmd: b.startYmd,
+    endYmd: b.endYmd,
+    dayCount: b.dayCount,
+  };
+}
 
-export function rangeForPeriod(period: StatsPeriod, now = new Date(), custom?: { from: string; to: string }): StatsRange {
+export function rangeForPeriod(
+  period: StatsPeriod,
+  now = new Date(),
+  custom?: { from: string; to: string },
+): StatsRange {
   if (period === 'custom' && custom?.from && custom?.to) {
     const startYmd = custom.from;
     const endYmd = custom.to >= custom.from ? custom.to : custom.from;
-    return {
-      start: startOfDay(new Date(startYmd + 'T12:00:00')),
-      end: endOfDay(new Date(endYmd + 'T12:00:00')),
+    const start = startOfDay(new Date(`${startYmd}T12:00:00`));
+    const end = endOfDay(new Date(`${endYmd}T12:00:00`));
+  return {
+      start,
+      end,
       startYmd,
       endYmd,
       dayCount: Math.max(
         1,
-        Math.round(
-          (endOfDay(new Date(endYmd + 'T12:00:00')).getTime() -
-            startOfDay(new Date(startYmd + 'T12:00:00')).getTime()) /
-            86400000,
-        ) + 1,
+        Math.round((end.getTime() - start.getTime()) / 86400000) + 1,
       ),
     };
   }
@@ -44,41 +52,14 @@ export function rangeForPeriod(period: StatsPeriod, now = new Date(), custom?: {
         dayCount: 1,
       };
     }
-    case 'week': {
-      const start = startOfWeek(now, WEEK_OPTS);
-      const end = endOfDay(now);
-      return {
-        start,
-        end,
-        startYmd: format(start, 'yyyy-MM-dd'),
-        endYmd: format(end, 'yyyy-MM-dd'),
-        dayCount: Math.max(1, Math.round((end.getTime() - startOfDay(start).getTime()) / 86400000) + 1),
-      };
-    }
-    case 'month': {
-      const start = startOfMonth(now);
-      const end = endOfDay(now);
-      return {
-        start,
-        end,
-        startYmd: format(start, 'yyyy-MM-dd'),
-        endYmd: format(end, 'yyyy-MM-dd'),
-        dayCount: Math.max(1, Math.round((end.getTime() - startOfDay(start).getTime()) / 86400000) + 1),
-      };
-    }
-    case 'year': {
-      const start = startOfYear(now);
-      const end = endOfDay(now);
-      return {
-        start,
-        end,
-        startYmd: format(start, 'yyyy-MM-dd'),
-        endYmd: format(end, 'yyyy-MM-dd'),
-        dayCount: Math.max(1, Math.round((end.getTime() - startOfDay(start).getTime()) / 86400000) + 1),
-      };
-    }
+    case 'week':
+      return toStatsRange(calendarWeekBounds(now));
+    case 'month':
+      return toStatsRange(calendarMonthBounds(now));
+    case 'year':
+      return toStatsRange(calendarYearBounds(now));
     default:
-      return rangeForPeriod('week', now);
+      return toStatsRange(calendarWeekBounds(now));
   }
 }
 

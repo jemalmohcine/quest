@@ -11,7 +11,8 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { User, Globe, Target, Bell, Download, Trash2, LogOut, Info, Camera, Loader2, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { format, startOfMonth, startOfWeek } from 'date-fns';
+import { format } from 'date-fns';
+import { calendarMonthBounds, calendarWeekBounds } from '@/lib/calendar-period';
 import { DURATION_UNITS_GOAL, formatDeedDurationPhrase, type DurationUnit } from '@/lib/duration-units';
 import { cn, sumPillarObjectives } from '@/lib/utils';
 import { normalizeFeelingKey } from '@/lib/feelings';
@@ -248,11 +249,11 @@ export function More() {
       let deeds = mapDeedRows(raw);
 
       if (exportFilter === 'week') {
-        const start = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-        deeds = deeds.filter((d) => d.date >= start);
+        const { startYmd, endYmd } = calendarWeekBounds();
+        deeds = deeds.filter((d) => d.date >= startYmd && d.date <= endYmd);
       } else if (exportFilter === 'month') {
-        const start = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-        deeds = deeds.filter((d) => d.date >= start);
+        const { startYmd, endYmd } = calendarMonthBounds();
+        deeds = deeds.filter((d) => d.date >= startYmd && d.date <= endYmd);
       }
 
       const csvContent =
