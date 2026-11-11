@@ -14,6 +14,7 @@ create table if not exists public.profiles (
   duration_objective_per_pillar jsonb not null default '{}',
   custom_feelings jsonb not null default '[]',
   photo_url text,
+  goal_pack_id text check (goal_pack_id in ('essential', 'balanced', 'momentum')),
   created_at timestamptz not null default now()
 );
 

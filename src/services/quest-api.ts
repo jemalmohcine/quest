@@ -21,6 +21,7 @@ export const questApi = {
       duration_objective_per_pillar?: Record<string, unknown>;
       custom_feelings?: string[];
       photo_url?: string | null;
+      goal_pack_id?: string | null;
     },
   ) {
     return supabase.from('profiles').upsert(profile, { onConflict: 'id' });

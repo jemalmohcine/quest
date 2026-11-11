@@ -1,4 +1,7 @@
 import type { DurationUnit } from '@/lib/duration-units';
+import type { GoalPackId } from '@/lib/goal-packs';
+
+export type { GoalPackId };
 
 export type Pillar = 'soulset' | 'healthset' | 'mindset' | 'skillset' | 'heartset';
 
@@ -34,6 +37,8 @@ export interface UserProfile {
   /** Sentiments supplémentaires saisis par l'utilisateur (slug lowercase). */
   customFeelings?: string[];
   photoURL?: string;
+  /** Preset pack last applied, null if goals are custom. */
+  goalPackId?: GoalPackId | null;
 }
 
 export interface Deed {
