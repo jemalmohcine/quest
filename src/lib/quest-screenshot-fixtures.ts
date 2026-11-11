@@ -7,6 +7,7 @@ import { goalPackToProfileSettings, DEFAULT_GOAL_PACK_ID } from '@/lib/goal-pack
 import type { UserProfile } from '@/types';
 
 export function isQuestScreenshotFixtureMode(): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
   return process.env.NEXT_PUBLIC_QUEST_SCREENSHOT_FIXTURES === '1';
 }
 

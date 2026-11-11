@@ -208,8 +208,8 @@ export function Dashboard({
                         )}
                       >
                         <Icon className={cn('w-5 h-5', isDone ? 'text-white' : 'text-indigo-300/50')} />
-                        <span className="text-[10px] font-bold uppercase tracking-tighter text-white/80 text-center leading-tight">
-                          {PILLAR_LABELS[dashLang][pillar].slice(0, 8)}
+                        <span className="line-clamp-2 w-full px-0.5 text-center text-[9px] font-bold uppercase leading-tight tracking-wide text-white/85">
+                          {PILLAR_LABELS[dashLang][pillar]}
                         </span>
                         {target > 0 && (
                           <span className="text-[9px] font-black tabular-nums text-white/70">

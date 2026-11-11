@@ -232,7 +232,7 @@ export const translations = {
     resumeWarning: "💡 Tip: It's best to wait until the end of the week to generate your summary. You can only generate it once to capture all your activities in a complete analysis.",
   },
   fr: {
-    dashboard: "Tableau de bord",
+    dashboard: "Accueil",
     stats: "Statistiques",
     resumes: "Résumés",
     settings: "Paramètres",

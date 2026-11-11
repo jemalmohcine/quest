@@ -186,7 +186,7 @@ export function QuestShell() {
                   )}
                 >
                   <item.icon className="h-5 w-5 shrink-0" />
-                  <span className="w-full truncate text-center text-[9px] font-bold uppercase leading-tight tracking-tight">
+                  <span className="line-clamp-2 w-full px-0.5 text-center text-[8px] font-bold uppercase leading-tight tracking-wide sm:text-[9px]">
                     {item.label}
                   </span>
                 </button>
