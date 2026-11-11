@@ -29,6 +29,7 @@ export const profilePatchSchema = z.object({
   durationObjectivePerPillar: durationObjectivePerPillarSchema.optional(),
   customFeelings: z.array(z.string().trim().max(40)).max(50).optional(),
   photoURL: z.string().max(3_000_000).optional().nullable(),
+  goalPackId: z.enum(['essential', 'balanced', 'momentum']).nullable().optional(),
 });
 
 export type ProfilePatchInput = z.infer<typeof profilePatchSchema>;
@@ -43,6 +44,7 @@ export const profileUpsertBodySchema = z.object({
   duration_objective_per_pillar: durationObjectivePerPillarSchema.default({}),
   custom_feelings: z.array(z.string().max(80)).max(50),
   photo_url: z.string().nullable().optional(),
+  goal_pack_id: z.enum(['essential', 'balanced', 'momentum']).nullable().optional(),
 });
 
 export type ProfileUpsertBody = z.infer<typeof profileUpsertBodySchema>;

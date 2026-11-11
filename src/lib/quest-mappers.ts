@@ -13,6 +13,7 @@ type ProfileRow = {
   duration_objective_per_pillar?: Record<string, unknown> | null;
   custom_feelings: string[];
   photo_url?: string | null;
+  goal_pack_id?: string | null;
   created_at?: string;
 };
 
@@ -37,6 +38,10 @@ export function profileRowToUserProfile(row: ProfileRow): UserProfile {
     durationObjectivePerPillar: parseDurationObjectivesFromDb(row.duration_objective_per_pillar ?? undefined),
     customFeelings: Array.isArray(row.custom_feelings) ? row.custom_feelings : [],
     photoURL: row.photo_url ?? undefined,
+    goalPackId:
+      row.goal_pack_id === 'essential' || row.goal_pack_id === 'balanced' || row.goal_pack_id === 'momentum'
+        ? row.goal_pack_id
+        : null,
   };
 }
 
@@ -56,6 +61,7 @@ export function userProfileToUpsertRow(
     duration_objective_per_pillar: profile.durationObjectivePerPillar ?? {},
     custom_feelings: profile.customFeelings ?? [],
     photo_url: profile.photoURL ?? null,
+    goal_pack_id: profile.goalPackId ?? null,
   };
 }
 

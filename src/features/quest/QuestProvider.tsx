@@ -73,11 +73,12 @@ export function QuestProvider({ children }: { children: React.ReactNode }) {
         language: row.language === 'fr' ? 'fr' : 'en',
         theme: row.theme === 'dark' || row.theme === 'light' || row.theme === 'system' ? row.theme : 'system',
         daily_objective: row.daily_objective,
-      objective_per_pillar: row.objective_per_pillar as ProfileUpsertBody['objective_per_pillar'],
-      duration_objective_per_pillar: row.duration_objective_per_pillar as ProfileUpsertBody['duration_objective_per_pillar'],
-      custom_feelings: row.custom_feelings ?? [],
-      photo_url: row.photo_url ?? undefined,
-    });
+        objective_per_pillar: row.objective_per_pillar as ProfileUpsertBody['objective_per_pillar'],
+        duration_objective_per_pillar: row.duration_objective_per_pillar as ProfileUpsertBody['duration_objective_per_pillar'],
+        custom_feelings: row.custom_feelings ?? [],
+        photo_url: row.photo_url ?? undefined,
+        goal_pack_id: (row.goal_pack_id ?? null) as ProfileUpsertBody['goal_pack_id'],
+      });
     if (insErr) {
         console.error('[quest] profile insert', insErr);
         setProfile(base);
@@ -226,6 +227,7 @@ export function QuestProvider({ children }: { children: React.ReactNode }) {
         ...current.durationObjectivePerPillar,
         ...(updates.durationObjectivePerPillar ?? {}),
       },
+      goalPackId: updates.goalPackId !== undefined ? updates.goalPackId : current.goalPackId ?? null,
     };
     if (updates.theme) {
       persistTheme(updates.theme);
@@ -241,6 +243,7 @@ export function QuestProvider({ children }: { children: React.ReactNode }) {
       duration_objective_per_pillar: row.duration_objective_per_pillar as ProfileUpsertBody['duration_objective_per_pillar'],
       custom_feelings: row.custom_feelings ?? [],
       photo_url: row.photo_url ?? undefined,
+      goal_pack_id: (merged.goalPackId ?? row.goal_pack_id ?? null) as ProfileUpsertBody['goal_pack_id'],
     });
     if (error) {
       console.error('[quest] profile update', error);

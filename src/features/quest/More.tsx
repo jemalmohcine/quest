@@ -19,6 +19,8 @@ import { normalizeFeelingKey } from '@/lib/feelings';
 import { applyDomTheme, persistTheme } from '@/lib/theme-preference';
 import { UI_CONSTANTS } from '@/constants';
 import { SectionHeader } from './SectionHeader';
+import { GoalPacksPanel } from './GoalPacksPanel';
+import { detectMatchingGoalPack } from '@/lib/goal-packs';
 
 type SettingsTab = 'profile' | 'preferences' | 'goals' | 'data';
 
@@ -152,11 +154,41 @@ export function More() {
       }
     }
 
+    const mergedForDetect = {
+      ...(profile ?? {}),
+      objectivePerPillar: next,
+      dailyObjective: total,
+      durationObjectivePerPillar,
+    } as UserProfile;
+
     await patchProfile({
       objectivePerPillar: next,
       dailyObjective: total,
       durationObjectivePerPillar,
+      goalPackId: detectMatchingGoalPack(mergedForDetect),
     });
+  };
+
+  const syncDraftFromProfile = () => {
+    if (!profile) return;
+    const o = profile.objectivePerPillar;
+    setPillarDraft({
+      soulset: String(o.soulset),
+      healthset: String(o.healthset),
+      mindset: String(o.mindset),
+      skillset: String(o.skillset),
+      heartset: String(o.heartset),
+    });
+    const next = { ...durationDraft };
+    for (const p of PILLARS) {
+      if (p === 'heartset') {
+        next[p] = { value: '', unit: 'minutes' };
+        continue;
+      }
+      const obj = profile.durationObjectivePerPillar?.[p];
+      next[p] = obj ? { value: String(obj.value), unit: obj.unit } : { value: '', unit: 'minutes' };
+    }
+    setDurationDraft(next);
   };
 
   const addCustomFeeling = async () => {
@@ -455,6 +487,8 @@ export function More() {
             <h3 className="sr-only">{t('pillarObjectives')}</h3>
             <Card className={cn('overflow-hidden border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900', UI_CONSTANTS.cardRadius)}>
               <CardContent className="space-y-8 p-6 md:p-8">
+                <GoalPacksPanel disabled={isUpdating} onApplied={syncDraftFromProfile} />
+
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex min-w-0 items-start gap-4">
                     <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center bg-zinc-50 dark:bg-zinc-800', UI_CONSTANTS.buttonRadius)}>
